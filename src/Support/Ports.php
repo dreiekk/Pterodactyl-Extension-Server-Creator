@@ -9,8 +9,8 @@ final class Ports
     /**
      * Finds sets matching ordered offsets on one node and IP, preferring the given primary.
      *
-     * @param iterable<array{id: int, node: int, ip: string, port: int}> $free
-     * @param list<int> $offsets
+     * @param  iterable<array{id: int, node: int, ip: string, port: int}>  $free
+     * @param  list<int>  $offsets
      * @return list<int>|null Allocation IDs in the order of the offsets.
      */
     public static function select(iterable $free, array $offsets, ?int $preferred = null): ?array
@@ -40,6 +40,7 @@ final class Ports
 
         return $matches === [] ? null : $matches[array_rand($matches)];
     }
+
     /**
      * Every set of `count` free allocations whose ports follow each other on one node and IP.
      * Runs do not overlap, so `[1, 2, 3, 4]` with a count of 2 gives `[1, 2]` and `[3, 4]`.

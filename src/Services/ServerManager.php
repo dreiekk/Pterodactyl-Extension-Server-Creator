@@ -282,6 +282,13 @@ final readonly class ServerManager
         });
     }
 
+    public function owned(User $user, Server $server): OwnedServer
+    {
+        return OwnedServer::query()->with('game')->where('user_id', $user->id)->where('server_id', $server->id)->firstOr(
+            static fn () => throw new CreatorException('Only servers you created yourself can be changed here.', 403),
+        );
+    }
+
     /**
      * @param  list<Allocation>  $incoming
      * @return list<int>
@@ -295,13 +302,6 @@ final readonly class ServerManager
         throw_if($ports === null, new CreatorException("The port set does not fit {$server->name}'s port limit, range or required game port pattern."));
 
         return $ports;
-    }
-
-    public function owned(User $user, Server $server): OwnedServer
-    {
-        return OwnedServer::query()->with('game')->where('user_id', $user->id)->where('server_id', $server->id)->firstOr(
-            static fn () => throw new CreatorException('Only servers you created yourself can be changed here.', 403),
-        );
     }
 
     /**

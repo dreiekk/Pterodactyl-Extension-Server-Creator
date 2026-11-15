@@ -10,6 +10,7 @@ namespace ServerCreator\Support;
 final readonly class Quota
 {
     public const array RESOURCES = ['servers', 'memory', 'disk', 'cpu', 'databases', 'backups', 'allocations'];
+
     public const int UNLIMITED = -1;
 
     /** The smallest size a self-created server may have; 0 would mean unlimited to Pterodactyl. */
