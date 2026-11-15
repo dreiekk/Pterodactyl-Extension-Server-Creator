@@ -9,6 +9,21 @@ use ServerCreator\Support\Ports;
 
 final class PortsTest extends TestCase
 {
+    public function test_swap_checks_both_required_pattern_and_entire_port_set(): void
+    {
+        $ports = [
+            ['id' => 1, 'ip' => '10.0.0.1', 'port' => 27015],
+            ['id' => 2, 'ip' => '10.0.0.1', 'port' => 27016],
+            ['id' => 3, 'ip' => '10.0.0.2', 'port' => 28000],
+        ];
+        $this->assertSame([27015, 27016], Ports::swapFit($ports, 1, 3, [], [0, 1]));
+        $this->assertNull(Ports::swapFit($ports, 1, 2, [], [0, 1]));
+        $this->assertNull(Ports::swapFit($ports, 1, 3, [[27015, 27016]], [0, 1]));
+        $this->assertNull(Ports::swapFit($ports, 2, 3, [], [0, 1]));
+        $this->assertNull(Ports::swapFit($ports, 99, 3, [], [0, 1]));
+        $this->assertNull(Ports::swapFit($ports, 1, 3, [], [0, 985]));
+    }
+
     public function test_preferred_port_sets_and_fallback_preserve_offsets_on_one_node_and_ip(): void
     {
         $free = [

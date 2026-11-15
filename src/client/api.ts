@@ -101,6 +101,7 @@ export interface ServerAllocations {
     range: string | null;
     limit: number;
     allocations: { id: number; ip: string; port: number; assigned: boolean }[];
+    swap_servers: { id: number; identifier: string; name: string; ports: string[] }[];
 }
 
 export interface SwitchInput {
@@ -161,6 +162,8 @@ export const deleteServer = async (id: string, name: string) => http.delete(serv
 export const getAllocations = async (id: string) => (await http.get<ServerAllocations>(`${server(id)}/allocations`)).data;
 export const saveAllocations = async (id: string, primary: number, allocations: number[]) =>
     (await http.put<ServerAllocations>(`${server(id)}/allocations`, { primary, allocations })).data;
+export const swapAllocations = async (id: string, other: number) =>
+    (await http.post<ServerAllocations>(`${server(id)}/allocations/swap`, { server: other })).data;
 
 export const getAdmin = async () => (await http.get<Admin>(admin)).data;
 export const saveGame = async (game: GameInput, id?: number) => (id ? await http.put<Admin>(`${admin}/games/${id}`, game) : await http.post<Admin>(`${admin}/games`, game)).data;

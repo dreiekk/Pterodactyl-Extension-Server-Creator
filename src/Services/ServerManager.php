@@ -223,6 +223,80 @@ final readonly class ServerManager
         });
     }
 
+    public function swapAllocations(User $user, Server $server, int $otherId): void
+    {
+        throw_if($server->id === $otherId, new CreatorException('Choose another server.'));
+        throw_unless((int) $server->owner_id === (int) $user->id, new CreatorException('Only the server owner can manage its ports.', 403));
+
+        Cache::lock("ext:server-creator:user:{$user->id}", 60)->block(15, function () use ($user, $server, $otherId): void {
+            $servers = DB::transaction(function () use ($user, $server, $otherId): array {
+                $servers = Server::query()->without('allocation')->whereIn('id', [$server->id, $otherId])
+                    ->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+                $first = $servers->get($server->id);
+                $second = $servers->get($otherId);
+                throw_unless($first !== null && $second !== null && (int) $first->owner_id === (int) $user->id && (int) $second->owner_id === (int) $user->id, new CreatorException('Both servers must belong to you.', 403));
+                throw_unless($first->node_id === $second->node_id, new CreatorException('Both servers must be on the same node.'));
+                throw_unless($this->panel->isStopped($first) && $this->panel->isStopped($second), new CreatorException('Stop both servers before swapping their ports.', 409));
+
+                $allocations = Allocation::query()->whereIn('server_id', [$first->id, $second->id])
+                    ->orderBy('id')->lockForUpdate()->get();
+                $firstPorts = $allocations->where('server_id', $first->id)->values();
+                $secondPorts = $allocations->where('server_id', $second->id)->values();
+                throw_if($allocations->contains(static fn (Allocation $allocation): bool => $allocation->node_id !== $first->node_id), new CreatorException('Both port sets must be on the servers\' node.', 409));
+                $games = OwnedServer::query()->with('game')->whereIn('server_id', [$first->id, $second->id])->get()->keyBy('server_id');
+                $firstGame = $games->get($first->id)?->game;
+                $secondGame = $games->get($second->id)?->game;
+
+                $firstValues = $this->assertSwapFits($first, $firstGame, $secondPorts->all(), $second->allocation_id, $firstPorts->count());
+                $secondValues = $this->assertSwapFits($second, $secondGame, $firstPorts->all(), $first->allocation_id, $secondPorts->count());
+
+                // The panel has a non-null, unique primary allocation: use a locked spare while exchanging them.
+                $spare = $allocations->first(static fn (Allocation $allocation): bool => $allocation->id !== $first->allocation_id && $allocation->id !== $second->allocation_id);
+                $spare ??= Allocation::query()->onNodes([$first->node_id])->unassigned()
+                    ->whereNotIn('id', Server::query()->without('allocation')->select('allocation_id'))
+                    ->orderBy('id')->lockForUpdate()->first();
+                throw_if($spare === null, new CreatorException('A spare allocation on this node is needed to swap these ports. Ask an administrator.', 409));
+
+                $firstPrimary = $first->allocation_id;
+                $secondPrimary = $second->allocation_id;
+                $first->forceFill(['allocation_id' => $spare->id])->saveOrFail();
+                $second->forceFill(['allocation_id' => $firstPrimary])->saveOrFail();
+                $first->forceFill(['allocation_id' => $secondPrimary])->saveOrFail();
+
+                Allocation::query()->whereKey($firstPorts->modelKeys())->update(['server_id' => $second->id, 'notes' => null]);
+                Allocation::query()->whereKey($secondPorts->modelKeys())->update(['server_id' => $first->id, 'notes' => null]);
+                foreach ([[$first, $firstGame, $firstValues, $second], [$second, $secondGame, $secondValues, $first]] as [$target, $game, $ports, $source]) {
+                    if ($game !== null) {
+                        $environment = $this->panel->variableValues($target);
+                        $this->panel->setVariables($target, array_diff_assoc(Ports::fill($environment, $ports, $game->port_variables ?? []), $environment));
+                    }
+                    $this->panel->log('server:allocation.primary', $target, ['allocation' => $allocations->firstWhere('id', $target->allocation_id)->toString(), 'swapped_with' => $source->name]);
+                }
+
+                return [$first, $second];
+            });
+
+            foreach ($servers as $changed) {
+                $this->panel->sync($changed);
+            }
+        });
+    }
+
+    /**
+     * @param  list<Allocation>  $incoming
+     * @return list<int>
+     */
+    private function assertSwapFits(Server $server, ?Game $game, array $incoming, int $primary, int $currentCount): array
+    {
+        $limit = max((int) $server->allocation_limit, (int) ($game?->ports ?? 1), $currentCount);
+        $ranges = Ports::ranges((string) $game?->port_range) ?? [];
+        $rows = array_map(static fn (Allocation $allocation): array => ['id' => (int) $allocation->id, 'ip' => (string) $allocation->ip, 'port' => (int) $allocation->port], $incoming);
+        $ports = Ports::swapFit($rows, $primary, $limit, $ranges, $game?->portOffsets() ?? [0]);
+        throw_if($ports === null, new CreatorException("The port set does not fit {$server->name}'s port limit, range or required game port pattern."));
+
+        return $ports;
+    }
+
     public function owned(User $user, Server $server): OwnedServer
     {
         return OwnedServer::query()->with('game')->where('user_id', $user->id)->where('server_id', $server->id)->firstOr(

@@ -10,4 +10,5 @@ Route::put('/', [ServerController::class, 'update']);
 Route::put('/game', [ServerController::class, 'game']);
 Route::get('/allocations', [ServerController::class, 'allocations']);
 Route::put('/allocations', [ServerController::class, 'updateAllocations']);
+Route::post('/allocations/swap', [ServerController::class, 'swapAllocations']);
 Route::delete('/', [ServerController::class, 'destroy']);

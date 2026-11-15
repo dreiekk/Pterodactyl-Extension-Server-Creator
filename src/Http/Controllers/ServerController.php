@@ -127,6 +127,7 @@ final class ServerController
             'range' => $game?->port_range,
             'limit' => max((int) $server->allocation_limit, (int) ($game?->ports ?? 1), count($held)),
             'allocations' => $this->panel->selectableAllocations($server, Ports::ranges((string) $game?->port_range) ?? []),
+            'swap_servers' => $this->panel->swapCandidates($server),
         ]);
     }
 
@@ -139,6 +140,14 @@ final class ServerController
         ]);
 
         $this->manager->updateAllocations($request->user(), $server, (int) $data['primary'], array_map(intval(...), $data['allocations']));
+
+        return $this->allocations($request, $server->refresh());
+    }
+
+    public function swapAllocations(Request $request, Server $server): JsonResponse
+    {
+        $data = $request->validate(['server' => ['required', 'integer', 'min:1']]);
+        $this->manager->swapAllocations($request->user(), $server, (int) $data['server']);
 
         return $this->allocations($request, $server->refresh());
     }

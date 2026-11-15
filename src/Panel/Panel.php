@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace ServerCreator\Panel;
 
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use Pterodactyl\Contracts\Backups\DeletesBackups;
 use Pterodactyl\Contracts\Backups\InitiatesBackups;
 use Pterodactyl\Contracts\Backups\RestoresBackups;
@@ -146,7 +147,7 @@ final readonly class Panel
     public function isStopped(Server $server): bool
     {
         try {
-            return in_array(Daemon::server($server)->details()['state'] ?? 'offline', ['offline', 'stopped'], true);
+            return in_array(Daemon::server($server)->details()['state'] ?? null, ['offline', 'stopped'], true);
         } catch (DaemonConnectionException) {
             return false;
         }
@@ -188,6 +189,30 @@ final readonly class Panel
                 'port' => $allocation->port,
                 'assigned' => $allocation->server_id !== null && (int) $allocation->server_id === (int) $server->id,
             ])->all();
+    }
+
+    /** @return list<array{id: int, identifier: string, name: string, ports: list<string>}> */
+    public function swapCandidates(Server $server): array
+    {
+        return Server::query()->without('allocation')->where('owner_id', $server->owner_id)
+            ->where('node_id', $server->node_id)->whereKeyNot($server->id)
+            ->with('allocations')->orderBy('name')->get()
+            ->map(static fn (Server $other): array => [
+                'id' => $other->id,
+                'identifier' => $other->uuidShort,
+                'name' => $other->name,
+                'ports' => $other->allocations->sortBy('port')->map(static fn (Allocation $allocation): string => $allocation->toString())->values()->all(),
+            ])->all();
+    }
+
+    /** Synchronize the committed port changes using the panel's usual best-effort daemon sync. */
+    public function sync(Server $server): void
+    {
+        try {
+            Daemon::server($server->refresh())->sync();
+        } catch (DaemonConnectionException $exception) {
+            Log::warning($exception->getMessage(), ['exception' => $exception, 'server_id' => $server->id]);
+        }
     }
 
     /**

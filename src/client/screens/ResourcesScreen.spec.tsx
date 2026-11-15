@@ -5,7 +5,7 @@ import { createExtensionTestHost, createTestServer, type ExtensionTestHost } fro
 import * as api from '../api';
 import ResourcesScreen from './ResourcesScreen';
 
-vi.mock('../api', async (importOriginal) => ({ ...(await importOriginal<typeof import('../api')>()), getOwnedServer: vi.fn(), switchGame: vi.fn(), getAllocations: vi.fn(), saveAllocations: vi.fn() }));
+vi.mock('../api', async (importOriginal) => ({ ...(await importOriginal<typeof import('../api')>()), getOwnedServer: vi.fn(), switchGame: vi.fn(), getAllocations: vi.fn(), saveAllocations: vi.fn(), swapAllocations: vi.fn() }));
 
 let host: ExtensionTestHost | undefined;
 
@@ -103,6 +103,7 @@ test('lets the owner replace ports and choose a primary allocation', async () =>
         offsets: [0, 100],
         range: null,
         limit: 3,
+        swap_servers: [],
         allocations: [
             { id: 1, ip: '10.0.0.1', port: 27015, assigned: true },
             { id: 2, ip: '10.0.0.1', port: 27115, assigned: true },
@@ -125,10 +126,40 @@ test('lets the owner replace ports and choose a primary allocation', async () =>
 });
 
 test('shows port management for owners of servers created outside the extension', async () => {
-    vi.mocked(api.getAllocations).mockResolvedValue({ primary: 1, required: 1, offsets: [0], range: null, limit: 1, allocations: [{ id: 1, ip: '127.0.0.1', port: 7777, assigned: true }] });
+    vi.mocked(api.getAllocations).mockResolvedValue({ primary: 1, required: 1, offsets: [0], range: null, limit: 1, swap_servers: [], allocations: [{ id: 1, ip: '127.0.0.1', port: 7777, assigned: true }] });
     renderScreen({ owned: false, can_manage_ports: true }, 'running');
 
     expect(await screen.findByLabelText('127.0.0.1:7777')).toBeTruthy();
     expect(screen.getByText('Stop the server to change its ports.')).toBeTruthy();
     expect((screen.getByRole('button', { name: 'Save ports' }) as HTMLButtonElement).disabled).toBe(true);
+});
+
+test('confirms and swaps complete port sets with another server', async () => {
+    const allocations: api.ServerAllocations = {
+        primary: 1, required: 2, offsets: [0, 1], range: null, limit: 2,
+        allocations: [{ id: 1, ip: '10.0.0.1', port: 28015, assigned: true }, { id: 2, ip: '10.0.0.1', port: 28016, assigned: true }],
+        swap_servers: [{ id: 8, identifier: 'other123', name: 'Barotrauma A', ports: ['10.0.0.1:27015', '10.0.0.1:27016'] }],
+    };
+    vi.mocked(api.getAllocations).mockResolvedValue(allocations);
+    vi.mocked(api.swapAllocations).mockResolvedValue(allocations);
+    renderScreen(owned({ can_manage_ports: true }));
+
+    fireEvent.change(await screen.findByLabelText('Swap ports with another server'), { target: { value: '8' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Swap ports' }));
+    expect(await screen.findByText(/This server receives: 10.0.0.1:27015, 10.0.0.1:27016/)).toBeTruthy();
+    expect(screen.getByText(/Barotrauma A receives: 10.0.0.1:28015, 10.0.0.1:28016/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm swap' }));
+    await waitFor(() => expect(api.swapAllocations).toHaveBeenCalledWith('abcd1234', 8));
+});
+
+test('does not allow a running server to start a port swap', async () => {
+    vi.mocked(api.getAllocations).mockResolvedValue({
+        primary: 1, required: 1, offsets: [0], range: null, limit: 1,
+        allocations: [{ id: 1, ip: '10.0.0.1', port: 7777, assigned: true }],
+        swap_servers: [{ id: 8, identifier: 'other123', name: 'Other server', ports: ['10.0.0.1:7778'] }],
+    });
+    renderScreen(owned({ can_manage_ports: true }), 'running');
+    fireEvent.change(await screen.findByLabelText('Swap ports with another server'), { target: { value: '8' } });
+    expect((screen.getByRole('button', { name: 'Swap ports' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(api.swapAllocations).not.toHaveBeenCalled();
 });

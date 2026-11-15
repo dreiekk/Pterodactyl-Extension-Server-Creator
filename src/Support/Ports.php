@@ -137,6 +137,30 @@ final class Ports
     }
 
     /**
+     * Checks every incoming allocation against the recipient's limit and range, and returns
+     * the required ports in variable order when the primary matches its pattern.
+     *
+     * @param  list<array{id: int, ip: string, port: int}>  $allocations
+     * @param  list<array{int, int}>  $ranges
+     * @param  list<int>  $offsets
+     * @return list<int>|null
+     */
+    public static function swapFit(array $allocations, int $primary, int $limit, array $ranges, array $offsets): ?array
+    {
+        if (count($allocations) > $limit) {
+            return null;
+        }
+
+        foreach ($allocations as $allocation) {
+            if ($ranges !== [] && array_filter($ranges, static fn (array $range): bool => $allocation['port'] >= $range[0] && $allocation['port'] <= $range[1]) === []) {
+                return null;
+            }
+        }
+
+        return self::runFrom($allocations, $primary, count($offsets), $ranges, $offsets);
+    }
+
+    /**
      * Parses comma separated ports and ranges such as `25565-25600, 27015`.
      *
      * @return list<array{int, int}>|null Each entry as [first, last]; null when an entry is not a port or range.
