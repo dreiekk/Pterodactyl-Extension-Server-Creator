@@ -263,8 +263,8 @@ final readonly class ServerManager
                 $second->forceFill(['allocation_id' => $firstPrimary])->saveOrFail();
                 $first->forceFill(['allocation_id' => $secondPrimary])->saveOrFail();
 
-                Allocation::query()->whereKey($firstPorts->modelKeys())->update(['server_id' => $second->id, 'notes' => null]);
-                Allocation::query()->whereKey($secondPorts->modelKeys())->update(['server_id' => $first->id, 'notes' => null]);
+                Allocation::query()->whereKey($firstPorts->modelKeys())->update(['server_id' => $second->id]);
+                Allocation::query()->whereKey($secondPorts->modelKeys())->update(['server_id' => $first->id]);
                 foreach ([[$first, $firstGame, $firstValues, $second], [$second, $secondGame, $secondValues, $first]] as [$target, $game, $ports, $source]) {
                     if ($game !== null) {
                         $environment = $this->panel->variableValues($target);

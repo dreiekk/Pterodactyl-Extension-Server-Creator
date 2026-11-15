@@ -99,6 +99,7 @@ export default function AllocationsBox({ identifier, uuid }: { identifier: strin
                     {confirmSwap && candidate && (
                         <Dialog open onClose={() => setConfirmSwap(false)} title='Swap ports' preventExternalClose={swapping.isPending}>
                             <p className='srvc:text-sm'>Exchange all ports with {candidate.name}? Both servers must remain stopped.</p>
+                            <p className='srvc:mt-2 srvc:text-sm'>Allocation notes move with their ports and may be visible to users of the other server.</p>
                             <p className='srvc:mt-2 srvc:text-sm'>This server receives: {candidate.ports.join(', ')}.</p>
                             <p className='srvc:mt-2 srvc:text-sm'>{candidate.name} receives: {data.allocations.filter((allocation) => allocation.assigned).map((allocation) => `${allocation.ip}:${allocation.port}`).join(', ')}.</p>
                             <Dialog.Footer>
