@@ -11,17 +11,18 @@ namespace ServerCreator\Support;
 final class PopularGames
 {
     public const array GAMES = [
-        'games-paper' => ['egg' => 'Paper', 'name' => 'Minecraft: Paper', 'description' => 'Fast Minecraft server with plugin support.', 'steam_app_id' => null, 'memory' => [1024, 8192], 'disk' => [5120, 20480], 'cpu' => [100, 400]],
-        'games-counter-strike-2' => ['egg' => 'Counter-Strike 2', 'name' => 'Counter-Strike 2', 'description' => 'Competitive and casual matches with your own rules.', 'steam_app_id' => 730, 'memory' => [2048, 8192], 'disk' => [76800, 102400], 'cpu' => [100, 400]],
-        'games-valheim' => ['egg' => 'Valheim', 'name' => 'Valheim', 'description' => 'Viking survival for up to 10 players.', 'steam_app_id' => 892970, 'memory' => [2048, 8192], 'disk' => [4096, 10240], 'cpu' => [200, 400], 'ports' => 2],
+        'games-paper' => ['egg' => 'Paper', 'name' => 'Minecraft: Paper', 'description' => 'Fast Minecraft server with plugin support.', 'steam_app_id' => null, 'memory' => [1024, 8192], 'disk' => [5120, 20480], 'cpu' => [100, 400], 'default_ports' => [25565]],
+        'games-barotrauma' => ['egg' => 'Barotrauma', 'name' => 'Barotrauma', 'description' => 'Co-op submarine survival.', 'steam_app_id' => 602960, 'memory' => [2048, 8192], 'disk' => [4096, 10240], 'cpu' => [100, 400], 'ports' => 2, 'default_ports' => [27015, 27016]],
+        'games-counter-strike-2' => ['egg' => 'Counter-Strike 2', 'name' => 'Counter-Strike 2', 'description' => 'Competitive and casual matches with your own rules.', 'steam_app_id' => 730, 'memory' => [2048, 8192], 'disk' => [76800, 102400], 'cpu' => [100, 400], 'default_ports' => [27015]],
+        'games-valheim' => ['egg' => 'Valheim', 'name' => 'Valheim', 'description' => 'Viking survival for up to 10 players.', 'steam_app_id' => 892970, 'memory' => [2048, 8192], 'disk' => [4096, 10240], 'cpu' => [200, 400], 'ports' => 2, 'default_ports' => [2456, 2457]],
         'games-team-fortress-2' => ['egg' => 'Team Fortress 2', 'name' => 'Team Fortress 2', 'description' => 'Class-based team shooter.', 'steam_app_id' => 440, 'memory' => [2048, 4096], 'disk' => [20480, 30720], 'cpu' => [100, 200]],
-        'games-palworld' => ['egg' => 'Palworld', 'name' => 'Palworld', 'description' => 'Catch creatures and survive together.', 'steam_app_id' => 1623730, 'memory' => [8192, 32768], 'disk' => [10240, 30720], 'cpu' => [200, 800]],
+        'games-palworld' => ['egg' => 'Palworld', 'name' => 'Palworld', 'description' => 'Catch creatures and survive together.', 'steam_app_id' => 1623730, 'memory' => [8192, 32768], 'disk' => [10240, 30720], 'cpu' => [200, 800], 'default_ports' => [8211]],
         'games-project-zomboid' => ['egg' => 'Project Zomboid', 'name' => 'Project Zomboid', 'description' => 'Zombie survival sandbox.', 'steam_app_id' => 108600, 'memory' => [4096, 16384], 'disk' => [10240, 30720], 'cpu' => [200, 400], 'ports' => 2, 'port_variables' => ['STEAM_PORT']],
-        'games-terraria-vanilla' => ['egg' => 'Terraria Vanilla', 'name' => 'Terraria', 'description' => 'Dig, fight, explore and build.', 'steam_app_id' => 105600, 'memory' => [1024, 4096], 'disk' => [1024, 5120], 'cpu' => [100, 200]],
-        'games-tmodloader' => ['egg' => 'tModloader', 'name' => 'Terraria: tModLoader', 'description' => 'Terraria with mods.', 'steam_app_id' => 1281930, 'memory' => [2048, 8192], 'disk' => [2048, 10240], 'cpu' => [100, 200]],
+        'games-terraria-vanilla' => ['egg' => 'Terraria Vanilla', 'name' => 'Terraria', 'description' => 'Dig, fight, explore and build.', 'steam_app_id' => 105600, 'memory' => [1024, 4096], 'disk' => [1024, 5120], 'cpu' => [100, 200], 'default_ports' => [7777]],
+        'games-tmodloader' => ['egg' => 'tModloader', 'name' => 'Terraria: tModLoader', 'description' => 'Terraria with mods.', 'steam_app_id' => 1281930, 'memory' => [2048, 8192], 'disk' => [2048, 10240], 'cpu' => [100, 200], 'default_ports' => [7777]],
         'games-left-4-dead-2' => ['egg' => 'Left 4 Dead 2', 'name' => 'Left 4 Dead 2', 'description' => 'Co-op zombie shooter for four.', 'steam_app_id' => 550, 'memory' => [1024, 4096], 'disk' => [12288, 20480], 'cpu' => [100, 200]],
         'games-don-t-starve-together' => ['egg' => "Don't Starve Together", 'name' => "Don't Starve Together", 'description' => 'Co-op wilderness survival.', 'steam_app_id' => 322330, 'memory' => [2048, 4096], 'disk' => [6144, 10240], 'cpu' => [100, 200]],
-        'games-factorio' => ['egg' => 'Factorio', 'name' => 'Factorio', 'description' => 'Build and automate factories together.', 'steam_app_id' => 427520, 'memory' => [1024, 8192], 'disk' => [2048, 10240], 'cpu' => [100, 400]],
+        'games-factorio' => ['egg' => 'Factorio', 'name' => 'Factorio', 'description' => 'Build and automate factories together.', 'steam_app_id' => 427520, 'memory' => [1024, 8192], 'disk' => [2048, 10240], 'cpu' => [100, 400], 'default_ports' => [34197]],
         'games-the-isle' => ['egg' => 'The Isle', 'name' => 'The Isle', 'description' => 'Survive as a dinosaur.', 'steam_app_id' => 376210, 'memory' => [4096, 16384], 'disk' => [5120, 20480], 'cpu' => [200, 400], 'ports' => 3, 'port_variables' => ['RCON_PORT', 'QUEUE_PORT']],
         'games-satisfactory' => ['egg' => 'Satisfactory', 'name' => 'Satisfactory', 'description' => 'Build factories together.', 'steam_app_id' => 526870, 'memory' => [8192, 16384], 'disk' => [15360, 30720], 'cpu' => [200, 400], 'ports' => 2, 'port_variables' => ['RELIABLE_PORT']],
         'games-7-days-to-die' => ['egg' => '7 Days To Die', 'name' => '7 Days To Die', 'description' => 'Zombie survival crafting.', 'steam_app_id' => 251570, 'memory' => [4096, 12288], 'disk' => [15360, 30720], 'cpu' => [200, 400]],
@@ -79,6 +80,31 @@ final class PopularGames
             'cpu_max' => $game['cpu'][1],
             'ports' => $game['ports'] ?? 1,
             'port_variables' => $game['port_variables'] ?? [],
+            'default_ports' => $game['default_ports'] ?? [],
         ];
+    }
+
+    /** @return list<int> */
+    public static function defaultPorts(string $egg): array
+    {
+        $name = mb_strtolower($egg);
+        $known = [
+            'minecraft' => [25565],
+            'minecraft vanilla' => [25565],
+            'vanilla minecraft' => [25565],
+            'fabric' => [25565],
+            'forge' => [25565],
+            'spigot' => [25565],
+            'purpur' => [25565],
+            'terraria' => [7777],
+        ];
+
+        foreach (self::GAMES as $game) {
+            if (mb_strtolower($game['egg']) === $name && isset($game['default_ports'])) {
+                return $game['default_ports'];
+            }
+        }
+
+        return $known[$name] ?? [];
     }
 }

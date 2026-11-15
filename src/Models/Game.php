@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Pterodactyl\Models\Egg;
 use ServerCreator\Steam\Store;
+use ServerCreator\Support\PopularGames;
 
 /**
  * @property int $id
@@ -29,6 +30,7 @@ use ServerCreator\Steam\Store;
  * @property int $ports
  * @property list<string>|null $port_variables
  * @property string|null $port_range
+ * @property list<int>|null $default_ports
  * @property int $sort
  * @property bool $enabled
  * @property Egg $egg
@@ -43,7 +45,7 @@ final class Game extends Model
 
     protected function casts(): array
     {
-        return ['enabled' => 'boolean', 'steam_app_id' => 'integer', 'ports' => 'integer', 'port_variables' => 'array'];
+        return ['enabled' => 'boolean', 'steam_app_id' => 'integer', 'ports' => 'integer', 'port_variables' => 'array', 'default_ports' => 'array'];
     }
 
     public function egg(): BelongsTo
@@ -55,5 +57,21 @@ final class Game extends Model
     public function artwork(): ?string
     {
         return $this->image ?: ($this->steam_app_id ? Store::artwork($this->steam_app_id) : null);
+    }
+
+    /** @return list<int> */
+    public function preferredPorts(): array
+    {
+        $ports = $this->default_ports ?: PopularGames::defaultPorts($this->egg?->name ?? '');
+
+        return count($ports) === $this->ports ? $ports : [];
+    }
+
+    /** @return list<int> */
+    public function portOffsets(): array
+    {
+        $ports = $this->preferredPorts();
+
+        return $ports === [] ? range(0, max(1, $this->ports) - 1) : array_map(static fn (int $port): int => $port - $ports[0], $ports);
     }
 }

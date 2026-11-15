@@ -9,6 +9,32 @@ use ServerCreator\Support\Ports;
 
 final class PortsTest extends TestCase
 {
+    public function test_preferred_port_sets_and_fallback_preserve_offsets_on_one_node_and_ip(): void
+    {
+        $free = [
+            ['id' => 1, 'node' => 1, 'ip' => '10.0.0.1', 'port' => 27014],
+            ['id' => 2, 'node' => 1, 'ip' => '10.0.0.1', 'port' => 27015],
+            ['id' => 3, 'node' => 1, 'ip' => '10.0.0.1', 'port' => 27016],
+            ['id' => 4, 'node' => 1, 'ip' => '10.0.0.1', 'port' => 27115],
+            ['id' => 5, 'node' => 2, 'ip' => '10.0.0.1', 'port' => 27215],
+            ['id' => 6, 'node' => 1, 'ip' => '10.0.0.2', 'port' => 27215],
+        ];
+
+        $this->assertSame([2, 3], Ports::select($free, [0, 1], 27015));
+        $this->assertSame([2, 4], Ports::select($free, [0, 100], 27015));
+        $this->assertSame([4, 2], Ports::select($free, [0, -100], 27115));
+        $this->assertSame([2, 4], Ports::select($free, [0, 100], 12345));
+        $this->assertNull(Ports::select($free, [0, 200], 27015));
+        $this->assertSame([27015, 27115], Ports::runFrom([
+            ['id' => 2, 'ip' => '10.0.0.1', 'port' => 27015],
+            ['id' => 4, 'ip' => '10.0.0.1', 'port' => 27115],
+        ], 2, 2, [[27000, 27200]], [0, 100]));
+        $this->assertNull(Ports::runFrom([
+            ['id' => 2, 'ip' => '10.0.0.1', 'port' => 27015],
+            ['id' => 4, 'ip' => '10.0.0.1', 'port' => 27115],
+        ], 2, 2, [[27000, 27100]], [0, 100]));
+    }
+
     public function test_runs_need_consecutive_ports_on_one_node_and_ip(): void
     {
         $free = [

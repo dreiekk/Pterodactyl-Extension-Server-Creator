@@ -7,6 +7,40 @@ namespace ServerCreator\Support;
 final class Ports
 {
     /**
+     * Finds sets matching ordered offsets on one node and IP, preferring the given primary.
+     *
+     * @param iterable<array{id: int, node: int, ip: string, port: int}> $free
+     * @param list<int> $offsets
+     * @return list<int>|null Allocation IDs in the order of the offsets.
+     */
+    public static function select(iterable $free, array $offsets, ?int $preferred = null): ?array
+    {
+        $groups = [];
+        foreach ($free as $allocation) {
+            $groups[$allocation['node'].'|'.$allocation['ip']][$allocation['port']] = $allocation['id'];
+        }
+
+        $matches = [];
+        foreach ($groups as $ports) {
+            foreach ($ports as $start => $_) {
+                $ids = [];
+                foreach ($offsets as $offset) {
+                    if (! isset($ports[$start + $offset])) {
+                        continue 2;
+                    }
+                    $ids[] = $ports[$start + $offset];
+                }
+
+                if ($start === $preferred) {
+                    return $ids;
+                }
+                $matches[] = $ids;
+            }
+        }
+
+        return $matches === [] ? null : $matches[array_rand($matches)];
+    }
+    /**
      * Every set of `count` free allocations whose ports follow each other on one node and IP.
      * Runs do not overlap, so `[1, 2, 3, 4]` with a count of 2 gives `[1, 2]` and `[3, 4]`.
      *
@@ -66,14 +100,15 @@ final class Ports
     }
 
     /**
-     * The ports from the primary allocation on, when the server already holds `count` of them in a row on its IP
-     * and every one lies within the ranges. No ranges allow any port.
+     * The ports matching the offsets from the primary allocation, when the server holds them on its IP
+     * and every one lies within the ranges. Defaults to `count` consecutive ports. No ranges allow any port.
      *
      * @param  iterable<array{id: int, ip: string, port: int}>  $allocations  The server's allocations.
      * @param  list<array{int, int}>  $ranges
+     * @param  list<int>|null  $offsets
      * @return list<int>|null
      */
-    public static function runFrom(iterable $allocations, int $primary, int $count, array $ranges): ?array
+    public static function runFrom(iterable $allocations, int $primary, int $count, array $ranges, ?array $offsets = null): ?array
     {
         $held = [];
         $start = null;
@@ -87,7 +122,8 @@ final class Ports
             return null;
         }
 
-        $ports = range($start['port'], $start['port'] + max(1, $count) - 1);
+        $offsets ??= range(0, max(1, $count) - 1);
+        $ports = array_map(static fn (int $offset): int => $start['port'] + $offset, $offsets);
 
         foreach ($ports as $port) {
             $inRange = $ranges === [] || array_filter($ranges, static fn (array $range): bool => $port >= $range[0] && $port <= $range[1]) !== [];

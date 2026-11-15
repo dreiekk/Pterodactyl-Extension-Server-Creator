@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace ServerCreator\Services;
 
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Pterodactyl\Exceptions\Service\Deployment\NoViableAllocationException;
 use Pterodactyl\Exceptions\Service\Deployment\NoViableNodeException;
 use Pterodactyl\Models\Allocation;
@@ -40,7 +41,8 @@ final readonly class ServerManager
 
             try {
                 $ranges = Ports::ranges((string) $game->port_range) ?? [];
-                $allocations = $game->ports > 1 || $ranges !== [] ? $this->panel->allocationsInARow($egg, $input['memory'], $input['disk'], $this->panel->locations(), $game->ports, $ranges) : [];
+                $preferred = $game->preferredPorts();
+                $allocations = $game->ports > 1 || $ranges !== [] || $preferred !== [] ? $this->panel->allocationsForGame($egg, $input['memory'], $input['disk'], $this->panel->locations(), $game->portOffsets(), $ranges, $preferred[0] ?? null) : [];
 
                 $environment = Ports::fill($environment, array_map(static fn (Allocation $allocation): int => $allocation->port, $allocations), $game->port_variables ?? []);
 
@@ -114,9 +116,9 @@ final readonly class ServerManager
 
             $ranges = Ports::ranges((string) $game->port_range) ?? [];
 
-            if (Ports::runFrom($this->panel->allocationsOf($server), $server->allocation_id, $game->ports, $ranges) === null) {
+            if (Ports::runFrom($this->panel->allocationsOf($server), $server->allocation_id, $game->ports, $ranges, $game->portOffsets()) === null) {
                 try {
-                    $this->panel->freeRunOnNode($server, $game->ports, $ranges);
+                    $this->panel->freePortsOnNode($server, $game->portOffsets(), $ranges);
                 } catch (NoViableAllocationException) {
                     throw new CreatorException('The node this server runs on has no free ports for this game. Ask an administrator.');
                 }
@@ -148,7 +150,7 @@ final readonly class ServerManager
     }
 
     /**
-     * Gives the server the ports its game needs: when its own do not fit the game's range and ports in a row,
+     * Gives the server the ports its game needs: when its own do not fit the game's range and port pattern,
      * free ones on its node replace all of them. The extra ports go into the game's port variables.
      *
      * @throws NoViableAllocationException
@@ -156,10 +158,10 @@ final readonly class ServerManager
     public function fitPorts(Server $server, Game $game): Server
     {
         $ranges = Ports::ranges((string) $game->port_range) ?? [];
-        $ports = Ports::runFrom($this->panel->allocationsOf($server), $server->allocation_id, $game->ports, $ranges);
+        $ports = Ports::runFrom($this->panel->allocationsOf($server), $server->allocation_id, $game->ports, $ranges, $game->portOffsets());
 
         if ($ports === null) {
-            $run = $this->panel->freeRunOnNode($server, $game->ports, $ranges);
+            $run = $this->panel->freePortsOnNode($server, $game->portOffsets(), $ranges);
             $server = $this->panel->replaceAllocations($server, $run);
             $ports = array_map(static fn (Allocation $allocation): int => $allocation->port, $run);
         }
@@ -174,6 +176,51 @@ final readonly class ServerManager
     {
         $this->owned($user, $server);
         $this->panel->delete($server);
+    }
+
+    /** @param list<int> $ids */
+    public function updateAllocations(User $user, Server $server, int $primary, array $ids): void
+    {
+        throw_unless((int) $server->owner_id === (int) $user->id, new CreatorException('Only the server owner can manage its ports.', 403));
+
+        Cache::lock("ext:server-creator:user:{$user->id}", 60)->block(15, function () use ($user, $server, $primary, $ids): void {
+            DB::transaction(function () use ($user, $server, $primary, $ids): void {
+                $server = Server::query()->whereKey($server->id)->lockForUpdate()->firstOrFail();
+                throw_unless((int) $server->owner_id === (int) $user->id, new CreatorException('Only the server owner can manage its ports.', 403));
+                throw_unless($this->panel->isStopped($server), new CreatorException('Stop the server before changing its ports.', 409));
+                $game = OwnedServer::query()->with('game')->find($server->id)?->game;
+                $ranges = Ports::ranges((string) $game?->port_range) ?? [];
+                $held = $this->panel->allocationsOf($server);
+                $max = max((int) $server->allocation_limit, (int) ($game?->ports ?? 1), count($held));
+                throw_if(count($ids) > $max, new CreatorException('The server has reached its port limit.'));
+                throw_unless(in_array($primary, $ids, true), new CreatorException('Select a primary port.'));
+
+                $allocations = Allocation::query()->whereIn('id', $ids)->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+                throw_unless($allocations->count() === count($ids), new CreatorException('One or more ports are no longer available.', 409));
+
+                foreach ($allocations as $allocation) {
+                    throw_if((int) $allocation->node_id !== (int) $server->node_id || ($allocation->server_id !== null && (int) $allocation->server_id !== (int) $server->id), new CreatorException('One or more ports are no longer available on this node.', 409));
+                    $inRange = $ranges === [] || array_filter($ranges, static fn (array $range): bool => $allocation->port >= $range[0] && $allocation->port <= $range[1]) !== [];
+                    throw_unless($inRange || (int) $allocation->server_id === (int) $server->id, new CreatorException('A selected port is outside the game port range.'));
+                }
+
+                $selected = $allocations->map(static fn (Allocation $allocation): array => ['id' => (int) $allocation->id, 'ip' => (string) $allocation->ip, 'port' => (int) $allocation->port])->values()->all();
+                $ports = Ports::runFrom($selected, $primary, $game?->ports ?? 1, $ranges, $game?->portOffsets());
+                throw_if($ports === null, new CreatorException('Select all required ports in the game port pattern and range on the primary IP.'));
+
+                $ordered = [$allocations[$primary]];
+                foreach ($ids as $id) {
+                    if ($id !== $primary) {
+                        $ordered[] = $allocations[$id];
+                    }
+                }
+                $server = $this->panel->replaceAllocations($server, $ordered);
+                if ($game !== null) {
+                    $environment = $this->panel->variableValues($server);
+                    $this->panel->setVariables($server, array_diff_assoc(Ports::fill($environment, $ports, $game->port_variables ?? []), $environment));
+                }
+            });
+        });
     }
 
     public function owned(User $user, Server $server): OwnedServer

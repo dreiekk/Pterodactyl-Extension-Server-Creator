@@ -31,7 +31,17 @@ final class PopularGamesTest extends TestCase
             }
 
             $this->assertLessThan($game['ports'], count($game['port_variables']), $id);
+            $this->assertTrue($game['default_ports'] === [] || count($game['default_ports']) === $game['ports'], $id);
             $this->assertMatchesRegularExpression('/^games-[a-z0-9-]+$/', $id);
         }
+
+    }
+
+    public function test_common_default_ports(): void
+    {
+        $this->assertSame([27015, 27016], PopularGames::defaultPorts('Barotrauma'));
+        $this->assertSame([25565], PopularGames::defaultPorts('Paper'));
+        $this->assertSame([7777], PopularGames::defaultPorts('Terraria Vanilla'));
+        $this->assertSame([], PopularGames::defaultPorts('Unknown egg'));
     }
 }

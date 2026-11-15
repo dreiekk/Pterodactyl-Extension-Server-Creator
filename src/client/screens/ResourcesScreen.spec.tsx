@@ -5,7 +5,7 @@ import { createExtensionTestHost, createTestServer, type ExtensionTestHost } fro
 import * as api from '../api';
 import ResourcesScreen from './ResourcesScreen';
 
-vi.mock('../api', async (importOriginal) => ({ ...(await importOriginal<typeof import('../api')>()), getOwnedServer: vi.fn(), switchGame: vi.fn() }));
+vi.mock('../api', async (importOriginal) => ({ ...(await importOriginal<typeof import('../api')>()), getOwnedServer: vi.fn(), switchGame: vi.fn(), getAllocations: vi.fn(), saveAllocations: vi.fn() }));
 
 let host: ExtensionTestHost | undefined;
 
@@ -40,6 +40,7 @@ const game = (id: number, name: string, changes: Partial<api.Game> = {}): api.Ga
     ports: 1,
     port_variables: [],
     port_range: null,
+    default_ports: [],
     ...changes,
 });
 
@@ -76,7 +77,7 @@ test('switches to a game with the sizes moved into its limits', async () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Valheim/ }));
     expect(screen.getByRole('slider', { name: 'Memory' }).getAttribute('aria-valuetext')).toBe('4 GiB');
-    expect(screen.getByText(/moves to 2 free ports in a row in 2456-2500/)).toBeTruthy();
+    expect(screen.getByText(/moves to 2 free ports matching the game port pattern in 2456-2500/)).toBeTruthy();
 
     fireEvent.click(screen.getAllByRole('button', { name: 'Switch game' }).at(-1)!);
     await waitFor(() => expect(api.switchGame).toHaveBeenCalledWith('abcd1234', { game: 2, memory: 4096, disk: 10240, cpu: 100, keep_variables: true, reinstall: true }));
@@ -93,4 +94,41 @@ test('says so for servers the user did not create here', async () => {
     renderScreen({ owned: false });
 
     expect(await screen.findByText('Only servers you created yourself can be changed here.')).toBeTruthy();
+});
+
+test('lets the owner replace ports and choose a primary allocation', async () => {
+    const allocations: api.ServerAllocations = {
+        primary: 1,
+        required: 2,
+        offsets: [0, 100],
+        range: null,
+        limit: 3,
+        allocations: [
+            { id: 1, ip: '10.0.0.1', port: 27015, assigned: true },
+            { id: 2, ip: '10.0.0.1', port: 27115, assigned: true },
+            { id: 3, ip: '10.0.0.1', port: 28015, assigned: false },
+            { id: 4, ip: '10.0.0.1', port: 28115, assigned: false },
+        ],
+    };
+    vi.mocked(api.getAllocations).mockResolvedValue(allocations);
+    vi.mocked(api.saveAllocations).mockResolvedValue({ ...allocations, primary: 3 });
+    renderScreen(owned({ can_manage_ports: true }));
+
+    expect(await screen.findByText(/offsets 0, 100/)).toBeTruthy();
+    fireEvent.click(screen.getByLabelText('10.0.0.1:27015'));
+    fireEvent.click(screen.getByLabelText('10.0.0.1:27115'));
+    fireEvent.click(screen.getByLabelText('10.0.0.1:28015'));
+    fireEvent.click(screen.getByLabelText('10.0.0.1:28115'));
+    fireEvent.click(screen.getAllByLabelText('Primary')[0]);
+    fireEvent.click(screen.getByRole('button', { name: 'Save ports' }));
+    await waitFor(() => expect(api.saveAllocations).toHaveBeenCalledWith('abcd1234', 3, [3, 4]));
+});
+
+test('shows port management for owners of servers created outside the extension', async () => {
+    vi.mocked(api.getAllocations).mockResolvedValue({ primary: 1, required: 1, offsets: [0], range: null, limit: 1, allocations: [{ id: 1, ip: '127.0.0.1', port: 7777, assigned: true }] });
+    renderScreen({ owned: false, can_manage_ports: true }, 'running');
+
+    expect(await screen.findByLabelText('127.0.0.1:7777')).toBeTruthy();
+    expect(screen.getByText('Stop the server to change its ports.')).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Save ports' }) as HTMLButtonElement).disabled).toBe(true);
 });

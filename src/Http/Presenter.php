@@ -26,6 +26,7 @@ final class Presenter
             'sort' => $game->sort,
             'port_variables' => $game->port_variables ?? [],
             'port_range' => $game->port_range,
+            'default_ports' => $game->default_ports ?? [],
         ] + $game->only(['memory_min', 'memory_max', 'disk_min', 'disk_max', 'cpu_min', 'cpu_max', 'databases', 'backups', 'allocations', 'ports']);
 
         if ($withVariables) {

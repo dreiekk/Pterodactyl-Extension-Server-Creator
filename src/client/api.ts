@@ -37,6 +37,7 @@ export interface Game {
     port_variables: string[];
     /** Ports and ranges new servers get their ports from, such as `25565-25600`; null for any port. */
     port_range: string | null;
+    default_ports: number[];
     variables?: Variable[];
 }
 
@@ -76,6 +77,7 @@ export interface CreateInput {
 
 export interface OwnedServer {
     owned: boolean;
+    can_manage_ports?: boolean;
     allow_resize?: boolean;
     allow_switch?: boolean;
     allow_delete?: boolean;
@@ -90,6 +92,15 @@ export interface OwnedServer {
     remaining?: Limits;
     /** Games the server can switch to. */
     games?: Game[];
+}
+
+export interface ServerAllocations {
+    primary: number;
+    required: number;
+    offsets: number[];
+    range: string | null;
+    limit: number;
+    allocations: { id: number; ip: string; port: number; assigned: boolean }[];
 }
 
 export interface SwitchInput {
@@ -132,6 +143,7 @@ const admin = '/api/admin/extensions/server-creator';
 export const keys = {
     overview: ['server-creator', 'overview'] as const,
     server: (id: string) => ['server-creator', 'server', id] as const,
+    allocations: (id: string) => ['server-creator', 'allocations', id] as const,
     admin: ['server-creator', 'admin'] as const,
     user: (id: number) => ['server-creator', 'user', id] as const,
     users: (query: string) => ['server-creator', 'users', query] as const,
@@ -146,6 +158,9 @@ export const getOwnedServer = async (id: string) => (await http.get<OwnedServer>
 export const resizeServer = async (id: string, resources: { memory: number; disk: number; cpu: number }) => (await http.put<OwnedServer>(server(id), resources)).data;
 export const switchGame = async (id: string, input: SwitchInput) => (await http.put<OwnedServer>(`${server(id)}/game`, input)).data;
 export const deleteServer = async (id: string, name: string) => http.delete(server(id), { data: { name } });
+export const getAllocations = async (id: string) => (await http.get<ServerAllocations>(`${server(id)}/allocations`)).data;
+export const saveAllocations = async (id: string, primary: number, allocations: number[]) =>
+    (await http.put<ServerAllocations>(`${server(id)}/allocations`, { primary, allocations })).data;
 
 export const getAdmin = async () => (await http.get<Admin>(admin)).data;
 export const saveGame = async (game: GameInput, id?: number) => (id ? await http.put<Admin>(`${admin}/games/${id}`, game) : await http.post<Admin>(`${admin}/games`, game)).data;

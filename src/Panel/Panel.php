@@ -97,24 +97,23 @@ final readonly class Panel
     }
 
     /**
-     * `count` free allocations with consecutive ports on a node that the panel's own deployment would pick.
-     * With ranges, every port of the run lies within them.
+     * Free allocations matching the ordered port offsets on a node the panel would pick.
+     * With ranges, every port lies within them.
      *
      * @param  list<int>  $locations
+     * @param  list<int>  $offsets
      * @param  list<array{int, int}>  $ranges
      * @return list<Allocation>
      */
-    public function allocationsInARow(Egg $egg, int $memory, int $disk, array $locations, int $count, array $ranges = []): array
+    public function allocationsForGame(Egg $egg, int $memory, int $disk, array $locations, array $offsets, array $ranges = [], ?int $preferredPort = null): array
     {
         $nodes = Node::query()->viableFor($memory, $disk)->inLocations($locations)->forEggTags($egg->tagSlugs())->forDeployTags([])->get()->pluck('id')->all();
         throw_if($nodes === [], NoViableNodeException::class, trans('exceptions.deployment.no_viable_nodes'));
 
         $free = Allocation::query()->unassigned()->onNodes($nodes)->onPorts([], $ranges)->toBase()->get(['id', 'node_id', 'ip', 'port'])
             ->map(static fn (object $row): array => ['id' => (int) $row->id, 'node' => (int) $row->node_id, 'ip' => (string) $row->ip, 'port' => (int) $row->port]);
-        $runs = Ports::runs($free, $count);
-        throw_if($runs === [], NoViableAllocationException::class, trans('exceptions.deployment.no_viable_allocations'));
-
-        $ids = $runs[array_rand($runs)];
+        $ids = Ports::select($free, $offsets, $preferredPort);
+        throw_if($ids === null, NoViableAllocationException::class, trans('exceptions.deployment.no_viable_allocations'));
         $allocations = Allocation::query()->whereIn('id', $ids)->get()->keyBy('id');
 
         return array_map(static fn (int $id): Allocation => $allocations[$id], $ids);
@@ -176,20 +175,34 @@ final readonly class Panel
             ->all();
     }
 
+    /** @param list<array{int, int}> $ranges */
+    public function selectableAllocations(Server $server, array $ranges): array
+    {
+        return Allocation::query()->onNodes([$server->node_id])
+            ->where(static fn ($query) => $query->whereNull('server_id')->orWhere('server_id', $server->id))
+            ->where(static fn ($query) => $query->where('server_id', $server->id)->orWhere(static fn ($free) => $free->whereNull('server_id')->onPorts([], $ranges)))
+            ->orderBy('ip')->orderBy('port')->get(['id', 'ip', 'port', 'server_id'])
+            ->map(static fn (Allocation $allocation): array => [
+                'id' => $allocation->id,
+                'ip' => $allocation->ip,
+                'port' => $allocation->port,
+                'assigned' => $allocation->server_id !== null && (int) $allocation->server_id === (int) $server->id,
+            ])->all();
+    }
+
     /**
-     * `count` free allocations with consecutive ports within the ranges, on the server's own node.
+     * Free allocations matching the ordered offsets within the ranges, on the server's own node.
      *
+     * @param  list<int>  $offsets
      * @param  list<array{int, int}>  $ranges
      * @return list<Allocation>
      */
-    public function freeRunOnNode(Server $server, int $count, array $ranges): array
+    public function freePortsOnNode(Server $server, array $offsets, array $ranges): array
     {
         $free = Allocation::query()->unassigned()->onNodes([$server->node_id])->onPorts([], $ranges)->toBase()->get(['id', 'node_id', 'ip', 'port'])
             ->map(static fn (object $row): array => ['id' => (int) $row->id, 'node' => (int) $row->node_id, 'ip' => (string) $row->ip, 'port' => (int) $row->port]);
-        $runs = Ports::runs($free, max(1, $count));
-        throw_if($runs === [], NoViableAllocationException::class, trans('exceptions.deployment.no_viable_allocations'));
-
-        $ids = $runs[array_rand($runs)];
+        $ids = Ports::select($free, $offsets);
+        throw_if($ids === null, NoViableAllocationException::class, trans('exceptions.deployment.no_viable_allocations'));
         $allocations = Allocation::query()->whereIn('id', $ids)->get()->keyBy('id');
 
         return array_map(static fn (int $id): Allocation => $allocations[$id], $ids);

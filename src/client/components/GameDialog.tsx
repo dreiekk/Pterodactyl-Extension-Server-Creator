@@ -51,6 +51,7 @@ function blank(eggs: Admin['eggs']): GameInput {
         ports: 1,
         port_variables: [],
         port_range: null,
+        default_ports: [],
     };
 }
 
@@ -61,12 +62,14 @@ function fromPreset(preset: PopularGame, eggs: Admin['eggs']): GameInput {
 export default function GameDialog({ game, preset = null, eggs, pending, onClose, onSave }: Props) {
     const [input, setInput] = useState<GameInput>(() => game ?? (preset ? fromPreset(preset, eggs) : blank(eggs)));
     const [portNames, setPortNames] = useState(input.port_variables.join(', '));
+    const [defaultPorts, setDefaultPorts] = useState(input.default_ports.join(', '));
     const [term, setTerm] = useState('');
     const steam = useQuery({ queryKey: keys.steam(term), queryFn: () => searchSteam(term), enabled: term.trim().length >= 2 });
     const set = (changes: Partial<GameInput>) => setInput((current) => ({ ...current, ...changes }));
     const egg = eggs.find((item) => item.id === input.egg_id);
     const artwork = input.image || (input.steam_app_id ? `https://cdn.cloudflare.steamstatic.com/steam/apps/${input.steam_app_id}/header.jpg` : null);
-    const valid = input.name.trim() !== '' && ((input.egg_id ?? 0) > 0 || !!input.catalog_id) && RANGES.every(({ key }) => input[`${key}_min`] <= input[`${key}_max`]);
+    const portsValid = defaultPorts.trim() === '' || (/^\s*\d+(?:\s*,\s*\d+)*\s*$/.test(defaultPorts) && input.default_ports.length === input.ports && new Set(input.default_ports).size === input.default_ports.length && input.default_ports.every((port) => port >= 1 && port <= 65535));
+    const valid = input.name.trim() !== '' && ((input.egg_id ?? 0) > 0 || !!input.catalog_id) && portsValid && RANGES.every(({ key }) => input[`${key}_min`] <= input[`${key}_max`]);
     const eggOptions = [
         ...(preset && preset.egg_id === null ? [{ value: `${CATALOG}${preset.catalog_id}`, label: `${preset.catalog_egg} (import from the egg catalog)` }] : []),
         ...eggs.map((item) => ({ value: item.id, label: item.name })),
@@ -152,7 +155,7 @@ export default function GameDialog({ game, preset = null, eggs, pending, onClose
                 <div className='srvc:grid srvc:gap-2'>
                     <div className='srvc:grid srvc:gap-4 srvc:sm:grid-cols-[10rem_minmax(0,1fr)]'>
                         <div>
-                            <Label htmlFor='srvc-ports'>Ports in a row</Label>
+                            <Label htmlFor='srvc-ports'>Required ports</Label>
                             <Input id='srvc-ports' type='number' min={1} max={10} value={input.ports} onChange={(event) => set({ ports: Number(event.currentTarget.value) })} />
                         </div>
                         <div>
@@ -169,7 +172,19 @@ export default function GameDialog({ game, preset = null, eggs, pending, onClose
                             />
                         </div>
                     </div>
-                    <p className='srvc:text-xs srvc:text-muted-foreground'>For games that need more than one port. The second, third and so on go into these egg variables, in order.</p>
+                    <p className='srvc:text-xs srvc:text-muted-foreground'>The second, third and later ports go into these egg variables, in order.</p>
+                </div>
+                <div className='srvc:grid srvc:gap-2'>
+                    <div>
+                        <Label htmlFor='srvc-default-ports'>Default ports</Label>
+                        <Input id='srvc-default-ports' placeholder='27015, 27016' value={defaultPorts} onChange={(event) => {
+                            const value = event.currentTarget.value;
+                            setDefaultPorts(value);
+                            set({ default_ports: value.split(',').map((port) => port.trim()).filter(Boolean).map(Number) });
+                        }} />
+                    </div>
+                    <p className='srvc:text-xs srvc:text-muted-foreground'>List one port per required port, primary first. If unavailable, the same spacing is used with other free ports on one IP. Empty uses consecutive ports or known egg defaults.</p>
+                    {!portsValid && <p className='srvc:text-xs srvc:text-destructive'>Enter distinct ports from 1 to 65535, one per required port.</p>}
                 </div>
                 <div className='srvc:grid srvc:gap-2'>
                     <div>

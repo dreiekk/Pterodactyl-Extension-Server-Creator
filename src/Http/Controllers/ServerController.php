@@ -13,7 +13,9 @@ use ServerCreator\Models\Game;
 use ServerCreator\Models\OwnedServer;
 use ServerCreator\Services\Quotas;
 use ServerCreator\Services\ServerManager;
+use ServerCreator\Panel\Panel;
 use ServerCreator\Settings;
+use ServerCreator\Support\Ports;
 use ServerCreator\Support\Quota;
 
 /**
@@ -21,7 +23,7 @@ use ServerCreator\Support\Quota;
  */
 final class ServerController
 {
-    public function __construct(private readonly ServerManager $manager, private readonly Quotas $quotas, private readonly Settings $settings) {}
+    public function __construct(private readonly ServerManager $manager, private readonly Quotas $quotas, private readonly Settings $settings, private readonly Panel $panel) {}
 
     public function index(Request $request, Server $server): JsonResponse
     {
@@ -29,7 +31,7 @@ final class ServerController
         $owned = OwnedServer::query()->with('game')->where('user_id', $user->id)->find($server->id);
 
         if ($owned === null) {
-            return new JsonResponse(['owned' => false]);
+            return new JsonResponse(['owned' => false, 'can_manage_ports' => (int) $server->owner_id === (int) $user->id]);
         }
 
         $quota = $this->quotas->for($user);
@@ -38,6 +40,7 @@ final class ServerController
 
         return new JsonResponse([
             'owned' => true,
+            'can_manage_ports' => (int) $server->owner_id === (int) $user->id,
             'allow_resize' => $this->settings->allowResize(),
             'allow_switch' => $this->settings->allowSwitch(),
             'allow_delete' => $this->settings->allowDelete(),
@@ -109,5 +112,34 @@ final class ServerController
         $this->manager->delete($request->user(), $server);
 
         return new JsonResponse(status: 204);
+    }
+
+    public function allocations(Request $request, Server $server): JsonResponse
+    {
+        throw_unless((int) $server->owner_id === (int) $request->user()->id, new CreatorException('Only the server owner can manage its ports.', 403));
+        $game = OwnedServer::query()->with('game')->find($server->id)?->game;
+        $held = $this->panel->allocationsOf($server);
+
+        return new JsonResponse([
+            'primary' => $server->allocation_id,
+            'required' => $game?->ports ?? 1,
+            'offsets' => $game?->portOffsets() ?? [0],
+            'range' => $game?->port_range,
+            'limit' => max((int) $server->allocation_limit, (int) ($game?->ports ?? 1), count($held)),
+            'allocations' => $this->panel->selectableAllocations($server, Ports::ranges((string) $game?->port_range) ?? []),
+        ]);
+    }
+
+    public function updateAllocations(Request $request, Server $server): JsonResponse
+    {
+        $data = $request->validate([
+            'primary' => ['required', 'integer', 'min:1'],
+            'allocations' => ['required', 'array', 'min:1', 'max:101'],
+            'allocations.*' => ['required', 'integer', 'min:1', 'distinct'],
+        ]);
+
+        $this->manager->updateAllocations($request->user(), $server, (int) $data['primary'], array_map(intval(...), $data['allocations']));
+
+        return $this->allocations($request, $server->refresh());
     }
 }

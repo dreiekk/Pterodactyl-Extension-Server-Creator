@@ -202,6 +202,8 @@ final class AdminController
             'ports' => ['integer', 'min:1', 'max:10'],
             'port_variables' => ['nullable', 'array', 'max:9'],
             'port_variables.*' => ['string', 'distinct', 'regex:/^[A-Za-z0-9_]{1,191}$/'],
+            'default_ports' => ['nullable', 'array', 'list', 'max:10'],
+            'default_ports.*' => ['required', 'integer', 'distinct', 'min:1', 'max:65535'],
             'port_range' => ['nullable', 'string', 'max:191', static function (string $attribute, mixed $value, Closure $fail): void {
                 if (Ports::ranges((string) $value) === null) {
                     $fail('Enter ports and ranges like 25565-25600, 27015.');
@@ -211,6 +213,14 @@ final class AdminController
             'enabled' => ['boolean'],
             ...($importable ? ['catalog_id' => ['nullable', 'string', Rule::in(array_keys(PopularGames::GAMES))]] : []),
         ]);
+
+        if (! empty($data['default_ports']) && count($data['default_ports']) !== (int) ($data['ports'] ?? 1)) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['default_ports' => 'Enter one default port for each required port.']);
+        }
+
+        if (array_key_exists('default_ports', $data)) {
+            $data['default_ports'] = array_map(intval(...), $data['default_ports'] ?? []);
+        }
 
         if (array_key_exists('port_range', $data)) {
             $data['port_range'] = Ports::format(Ports::ranges((string) $data['port_range']) ?? []) ?: null;

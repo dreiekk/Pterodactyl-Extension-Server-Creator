@@ -5,7 +5,7 @@ import { getOwnedServer, keys } from './api';
 import CreateBanner from './components/CreateBanner';
 import DuplicateButton from './components/DuplicateButton';
 
-/** Listed for servers the user created here while any of resize, switch or delete is allowed. */
+/** Owners can manage ports; creator-specific controls still follow their settings. */
 function useResourcesScreen(context: ScreenContext) {
     const identifier = context.server?.attributes.identifier ?? '';
     const { pathname, params } = usePanelLocation();
@@ -13,7 +13,7 @@ function useResourcesScreen(context: ScreenContext) {
     const data = owned.data;
 
     // Keep the screen routable while the answer loads, so opening its URL directly does not bounce.
-    return Boolean(data?.owned && (data.allow_resize || data.allow_switch || data.allow_delete)) || (owned.isPending && pathname.replace(/\/$/, '') === `/server/${params.id ?? identifier}/resources`);
+    return Boolean(data?.can_manage_ports || (data?.owned && (data.allow_resize || data.allow_switch || data.allow_delete))) || (owned.isPending && pathname.replace(/\/$/, '') === `/server/${params.id ?? identifier}/resources`);
 }
 
 export default definePterodactylExtension({
