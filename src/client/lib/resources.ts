@@ -144,5 +144,7 @@ export const EDIT_UNITS: Record<Sized, string> = { memory: 'GiB', disk: 'GiB', c
 
 /** "2 GiB of 4 GiB left" once `value` is taken out of what is available. */
 export function leftText(resource: Sized, value: number, available: number, limit: number): string {
+    if (limit === UNLIMITED) return 'Unlimited quota';
     return `${formatSize(resource, Math.max(0, available - value))} of ${formatSize(resource, limit)} left`;
 }
+import { UNLIMITED } from './quota';

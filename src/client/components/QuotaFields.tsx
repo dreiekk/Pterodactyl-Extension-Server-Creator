@@ -1,5 +1,6 @@
 import { Input, Label } from '@pterodactyl/sdk';
 import type { Limits, Resource } from '../api';
+import { UNLIMITED } from '../lib/quota';
 import { LABELS } from '../lib/format';
 import { UNITS, formatSize, isSized } from '../lib/resources';
 
@@ -16,8 +17,12 @@ export default function QuotaFields({ value, onChange, prefix }: { value: Limits
                             {LABELS[resource]}
                             {isSized(resource) && ` (${UNITS[resource]})`}
                         </Label>
-                        <Input id={id} type='number' min={0} value={value[resource]} aria-describedby={isSized(resource) ? `${id}-friendly` : undefined} onChange={(event) => onChange({ ...value, [resource]: Number(event.currentTarget.value) })} />
-                        {isSized(resource) && (
+                        <Input id={id} type='number' min={0} disabled={value[resource] === UNLIMITED} value={value[resource] === UNLIMITED ? '' : value[resource]} aria-describedby={isSized(resource) ? `${id}-friendly` : undefined} onChange={(event) => onChange({ ...value, [resource]: Number(event.currentTarget.value) })} />
+                        <label className='srvc:mt-1 srvc:flex srvc:items-center srvc:gap-1 srvc:text-xs'>
+                            <input type='checkbox' aria-label={`Unlimited ${LABELS[resource]}`} checked={value[resource] === UNLIMITED} onChange={(event) => onChange({ ...value, [resource]: event.currentTarget.checked ? UNLIMITED : 0 })} />
+                            Unlimited
+                        </label>
+                        {isSized(resource) && value[resource] !== UNLIMITED && (
                             <p id={`${id}-friendly`} className='srvc:mt-1 srvc:text-xs srvc:text-muted-foreground'>
                                 = {formatSize(resource, value[resource])}
                             </p>

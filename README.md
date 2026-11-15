@@ -23,7 +23,7 @@ Let users create their own servers within a quota, and duplicate servers in one 
 - **Manage ports**: server owners can select available allocations on their server's node and choose the primary port, within the allocation limit and game port rules. Stop the server before making changes.
 - **Swap ports**: owners can exchange complete allocation sets and primary ports between two of their stopped servers on the same node, subject to each game's port rules and limits. Allocation notes move with their ports and may be visible to users of the other server. If each server has only a primary allocation, an additional free allocation on the node is needed temporarily.
 - **Port ranges**: limit a game to ports such as `25565-25600`, so each game gets its own ports on a shared node.
-- **Quotas**: limit servers, memory, disk, CPU, databases, backups and ports, for everyone or per user.
+- **Quotas**: limit servers, memory, disk, CPU, databases, backups and ports, for everyone or per user. Each total quota can also be set to unlimited; zero still allows none. Individual game limits and node capacity continue to apply.
 - **Resources page**: owners resize, switch to another game and delete (opt-in) on their server's Resources page. A switch brings the new game's egg, limits and ports, and egg changes from other extensions keep the game and ports in step.
 - **Safe placement**: new servers only go to nodes with room, in the locations you choose.
 - **Duplicate**: copy any server from its admin page, optionally with all its files.

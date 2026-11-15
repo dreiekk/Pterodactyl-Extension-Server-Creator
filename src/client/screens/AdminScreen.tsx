@@ -7,6 +7,7 @@ import GameDialog from '../components/GameDialog';
 import QuotaFields from '../components/QuotaFields';
 import UserSelect from '../components/UserSelect';
 import { formatCpu, formatMiB } from '../lib/resources';
+import { formatResource } from '../lib/format';
 
 export default function AdminScreen() {
     const queryClient = useQueryClient();
@@ -105,7 +106,7 @@ export default function AdminScreen() {
 
                     <div className='srvc:grid srvc:items-start srvc:gap-6 srvc:lg:grid-cols-2'>
                         <TitledGreyBox title='Default quota'>
-                            <p className='srvc:mb-4 srvc:text-sm srvc:text-muted-foreground'>For everyone without a quota of their own. With 0 servers, users cannot create any.</p>
+                            <p className='srvc:mb-4 srvc:text-sm srvc:text-muted-foreground'>For everyone without a quota of their own. Zero allows none; unlimited removes the total quota, not individual server limits.</p>
                             <QuotaFields prefix='srvc-default' value={quota} onChange={setQuota} />
                             <div className='srvc:mt-4 srvc:flex srvc:justify-end'>
                                 <Button size='small' isLoading={quotaSaving.isPending} onClick={() => quotaSaving.mutate()}>
@@ -125,7 +126,7 @@ export default function AdminScreen() {
                                                     {user.username}
                                                 </PanelLink>
                                                 <span className='srvc:shrink-0 srvc:text-muted-foreground'>
-                                                    {user.limits.servers} servers · {formatMiB(user.limits.memory)}
+                                                    {formatResource('servers', user.limits.servers)} servers · {formatResource('memory', user.limits.memory)}
                                                 </span>
                                             </li>
                                         ))}

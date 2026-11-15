@@ -24,7 +24,12 @@ final class QuotaLimit extends Model
 {
     protected $table = 'ext_server_creator_quotas';
 
-    protected $fillable = ['user_id', 'servers', 'memory', 'disk', 'cpu', 'databases', 'backups', 'allocations'];
+    protected $fillable = ['user_id', 'servers', 'memory', 'disk', 'cpu', 'databases', 'backups', 'allocations', 'unlimited'];
+
+    protected function casts(): array
+    {
+        return ['unlimited' => 'array'];
+    }
 
     public function user(): BelongsTo
     {
@@ -34,6 +39,6 @@ final class QuotaLimit extends Model
     /** @return array<string, int> */
     public function limits(): array
     {
-        return array_map(intval(...), $this->only(Quota::RESOURCES));
+        return Quota::restore(array_map(intval(...), $this->only(Quota::RESOURCES)), $this->unlimited ?? []);
     }
 }

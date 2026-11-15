@@ -101,3 +101,16 @@ test('explains when the quota is used up', async () => {
     expect(screen.queryByRole('button', { name: /Paper/ })).toBeNull();
     host.dispose();
 });
+
+test('allows unlimited total quota while keeping game size caps', async () => {
+    const unlimited: api.Limits = { servers: -1, memory: -1, disk: -1, cpu: -1, databases: -1, backups: -1, allocations: -1 };
+    vi.mocked(api.getOverview).mockResolvedValue({ quota: { limits: unlimited, used: limits(0, 0), remaining: unlimited }, games: [{ ...game(1, 'Paper', 1024), backups: 1 }], servers: [] });
+    const host = renderScreen();
+
+    expect(await screen.findByText(/unlimited servers/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Paper/ }));
+    expect(screen.getAllByText('Unlimited quota')).toHaveLength(3);
+    expect(screen.getByText('4 GiB')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Create server' })).toBeTruthy();
+    host.dispose();
+});

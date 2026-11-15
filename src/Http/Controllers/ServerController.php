@@ -50,7 +50,9 @@ final class ServerController
             'current' => ['memory' => $server->memory, 'disk' => $server->disk, 'cpu' => $server->cpu],
             'limits' => collect(['memory', 'disk', 'cpu'])->mapWithKeys(static fn (string $resource): array => [$resource => [
                 'min' => $game?->{"{$resource}_min"} ?? Quota::SMALLEST[$resource],
-                'max' => min($game?->{"{$resource}_max"} ?? PHP_INT_MAX, $available[$resource]),
+                'max' => $available[$resource] === Quota::UNLIMITED
+                    ? ($game?->{"{$resource}_max"} ?? PHP_INT_MAX)
+                    : min($game?->{"{$resource}_max"} ?? PHP_INT_MAX, $available[$resource]),
             ]])->all(),
             'quota' => collect(['memory', 'disk', 'cpu'])->mapWithKeys(static fn (string $resource): array => [$resource => [
                 'limit' => $quota->limits[$resource] ?? 0,

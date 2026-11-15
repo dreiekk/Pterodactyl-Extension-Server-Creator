@@ -90,6 +90,19 @@ test('asks to stop a running server before switching', async () => {
     expect(screen.getByText('Stop the server to switch its game.')).toBeTruthy();
 });
 
+test('switches games with unlimited total quotas while respecting game maxima', async () => {
+    const unlimited: api.Limits = { servers: -1, memory: -1, disk: -1, cpu: -1, databases: -1, backups: -1, allocations: -1 };
+    const unlimitedQuota = { memory: { limit: -1, available: -1 }, disk: { limit: -1, available: -1 }, cpu: { limit: -1, available: -1 } };
+    renderScreen(owned({ remaining: unlimited, quota: unlimitedQuota }));
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Switch game' }));
+    expect((screen.getByRole('button', { name: /Rust/ }) as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(screen.getByRole('button', { name: /Rust/ }));
+    expect(screen.getByRole('slider', { name: 'Memory' }).getAttribute('aria-valuetext')).toBe('8 GiB');
+    expect(screen.getAllByText('Unlimited quota')).toHaveLength(3);
+    expect((screen.getAllByRole('button', { name: 'Switch game' }).at(-1) as HTMLButtonElement).disabled).toBe(false);
+});
+
 test('says so for servers the user did not create here', async () => {
     renderScreen({ owned: false });
 

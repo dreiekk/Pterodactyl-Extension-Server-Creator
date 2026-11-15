@@ -26,4 +26,48 @@ final class QuotaTest extends TestCase
         $this->assertSame(['memory', 'disk', 'cpu'], array_keys(Quota::SMALLEST));
         $this->assertGreaterThan(0, min(Quota::SMALLEST));
     }
+
+    public function test_unlimited_and_zero_quotas_remain_distinct(): void
+    {
+        $limits = array_fill_keys(Quota::RESOURCES, Quota::UNLIMITED);
+        $quota = new Quota($limits);
+        $used = array_fill_keys(Quota::RESOURCES, 1000000000);
+        $this->assertSame($limits, $quota->remaining($used));
+        $this->assertNull($quota->exceeded(['memory' => 999999, 'disk' => 999999, 'cpu' => 999999, 'databases' => 10, 'backups' => 10, 'allocations' => 10], $used));
+
+        foreach (Quota::RESOURCES as $resource) {
+            $restricted = $limits;
+            $restricted[$resource] = 0;
+            $quota = new Quota($restricted);
+            $this->assertSame(0, $quota->remaining($used)[$resource]);
+            $this->assertSame($resource, $quota->exceeded($resource === 'servers' ? [] : [$resource => 1], $used));
+        }
+    }
+
+    public function test_unlimited_remaining_is_preserved_when_resizing(): void
+    {
+        $quota = new Quota(['memory' => Quota::UNLIMITED, 'servers' => 0]);
+        $this->assertNull($quota->exceeded(['memory' => 4096], ['memory' => 9999], false));
+        $this->assertSame('servers', $quota->exceeded(['memory' => 4096], [], true));
+    }
+
+    public function test_zero_resources_cannot_be_requested_even_if_servers_are_unlimited(): void
+    {
+        $quota = new Quota(['servers' => Quota::UNLIMITED, 'memory' => 0, 'disk' => Quota::UNLIMITED]);
+        $this->assertSame('memory', $quota->exceeded(['memory' => 1], []));
+        $this->assertNull($quota->exceeded(['memory' => 0, 'disk' => 100], []));
+    }
+
+    public function test_unlimited_flags_round_trip_without_changing_zero_or_finite_values(): void
+    {
+        $limits = ['servers' => -1, 'memory' => 4096, 'disk' => 0, 'cpu' => -1, 'databases' => 0, 'backups' => 1, 'allocations' => -1];
+        $stored = Quota::attributesFor($limits);
+        $this->assertSame(['servers', 'cpu', 'allocations'], $stored['unlimited']);
+        $this->assertSame(0, $stored['servers']);
+        $this->assertSame(0, $stored['disk']);
+        $unlimited = $stored['unlimited'];
+        unset($stored['unlimited']);
+        $this->assertSame($limits, Quota::restore($stored, $unlimited));
+        $this->assertSame($stored, Quota::restore($stored, []));
+    }
 }

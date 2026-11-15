@@ -82,7 +82,7 @@ final class AdminController
 
     public function updateQuota(Request $request): JsonResponse
     {
-        QuotaLimit::query()->updateOrCreate(['user_id' => null], $this->validatedQuota($request));
+        QuotaLimit::query()->updateOrCreate(['user_id' => null], Quota::attributesFor($this->validatedQuota($request)));
 
         return $this->index();
     }
@@ -125,7 +125,7 @@ final class AdminController
     public function updateUser(Request $request, int $id): JsonResponse
     {
         $user = User::query()->findOrFail($id);
-        QuotaLimit::query()->updateOrCreate(['user_id' => $user->id], $this->validatedQuota($request));
+        QuotaLimit::query()->updateOrCreate(['user_id' => $user->id], Quota::attributesFor($this->validatedQuota($request)));
 
         return $this->user($id);
     }
@@ -233,7 +233,7 @@ final class AdminController
     private function validatedQuota(Request $request): array
     {
         return array_map(intval(...), $request->validate(
-            collect(Quota::RESOURCES)->mapWithKeys(static fn (string $resource): array => [$resource => ['required', 'integer', 'min:0', 'max:100000000']])->all(),
+            collect(Quota::RESOURCES)->mapWithKeys(static fn (string $resource): array => [$resource => ['required', 'integer', 'min:-1', 'max:100000000']])->all(),
         ));
     }
 }

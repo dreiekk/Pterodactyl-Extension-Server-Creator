@@ -23,6 +23,7 @@ describe('formatting', () => {
         expect(leftText('memory', 1024, 3072, 4096)).toBe('2 GiB of 4 GiB left');
         expect(leftText('cpu', 100, 100, 300)).toBe('0 cores of 3 cores left');
         expect(leftText('disk', 9999, 5120, 10240)).toBe('0 GiB of 10 GiB left');
+        expect(leftText('memory', 1024, -1, -1)).toBe('Unlimited quota');
     });
 });
 

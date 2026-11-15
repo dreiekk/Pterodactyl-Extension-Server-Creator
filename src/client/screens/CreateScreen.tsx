@@ -6,6 +6,7 @@ import Artwork from '../components/Artwork';
 import ResourceSlider from '../components/ResourceSlider';
 import { remainingText } from '../lib/format';
 import { SIZED, range, shortfall } from '../lib/games';
+import { UNLIMITED } from '../lib/quota';
 import { formatSize, type Sized } from '../lib/resources';
 
 export default function CreateScreen() {
@@ -49,6 +50,7 @@ export default function CreateScreen() {
     }
 
     const { remaining, limits } = overview.data.quota;
+    const noServers = remaining.servers !== UNLIMITED && remaining.servers < 1;
     const valid = game !== null && name.trim() !== '' && SIZED.every(({ key }) => sizes[key] >= range(game, remaining, key).min && sizes[key] <= range(game, remaining, key).max);
 
     return (
@@ -58,8 +60,8 @@ export default function CreateScreen() {
                 <p className='srvc:mt-1 srvc:text-sm srvc:leading-relaxed srvc:text-foreground/70'>{remainingText(remaining)}</p>
             </header>
 
-            {overview.data.games.length === 0 || remaining.servers < 1 ? (
-                <p className='srvc:py-8 srvc:text-center srvc:text-sm srvc:text-muted-foreground'>{remaining.servers < 1 ? 'Delete a server or ask an administrator for a higher limit.' : 'There are no games to choose from yet.'}</p>
+            {overview.data.games.length === 0 || noServers ? (
+                <p className='srvc:py-8 srvc:text-center srvc:text-sm srvc:text-muted-foreground'>{noServers ? 'Delete a server or ask an administrator for a higher limit.' : 'There are no games to choose from yet.'}</p>
             ) : (
                 <div className='srvc:grid srvc:gap-6'>
                     <section>

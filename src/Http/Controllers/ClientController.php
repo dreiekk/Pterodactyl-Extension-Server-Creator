@@ -11,6 +11,7 @@ use ServerCreator\Models\Game;
 use ServerCreator\Models\OwnedServer;
 use ServerCreator\Services\Quotas;
 use ServerCreator\Services\ServerManager;
+use ServerCreator\Support\Quota;
 
 final class ClientController
 {
@@ -23,7 +24,7 @@ final class ClientController
 
         return new JsonResponse([
             'quota' => $summary,
-            'games' => $summary['limits']['servers'] > 0
+            'games' => $summary['limits']['servers'] === Quota::UNLIMITED || $summary['limits']['servers'] > 0
                 ? Game::query()->with('egg')->where('enabled', true)->orderBy('sort')->orderBy('name')->get()->map(static fn (Game $game): array => Presenter::game($game, true))
                 : [],
             'servers' => OwnedServer::query()->with(['server' => static fn ($query) => $query->without('allocation')->select(['id', 'uuidShort', 'name']), 'game:id,name'])->where('user_id', $user->id)->get()->map(static fn (OwnedServer $owned): array => [
