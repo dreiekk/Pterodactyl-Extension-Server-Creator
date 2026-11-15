@@ -68,7 +68,9 @@ export default function GameDialog({ game, preset = null, eggs, pending, onClose
     const set = (changes: Partial<GameInput>) => setInput((current) => ({ ...current, ...changes }));
     const egg = eggs.find((item) => item.id === input.egg_id);
     const artwork = input.image || (input.steam_app_id ? `https://cdn.cloudflare.steamstatic.com/steam/apps/${input.steam_app_id}/header.jpg` : null);
-    const portsValid = defaultPorts.trim() === '' || (/^\s*\d+(?:\s*,\s*\d+)*\s*$/.test(defaultPorts) && input.default_ports.length === input.ports && new Set(input.default_ports).size === input.default_ports.length && input.default_ports.every((port) => port >= 1 && port <= 65535));
+    const portListValid = /^\s*\d+(?:\s*,\s*\d+)*\s*$/.test(defaultPorts) && input.default_ports.length <= 10 && new Set(input.default_ports).size === input.default_ports.length && input.default_ports.every((port) => port >= 1 && port <= 65535);
+    const portCountMismatch = defaultPorts.trim() !== '' && portListValid && input.default_ports.length !== input.ports;
+    const portsValid = defaultPorts.trim() === '' || (portListValid && !portCountMismatch);
     const valid = input.name.trim() !== '' && ((input.egg_id ?? 0) > 0 || !!input.catalog_id) && portsValid && RANGES.every(({ key }) => input[`${key}_min`] <= input[`${key}_max`]);
     const eggOptions = [
         ...(preset && preset.egg_id === null ? [{ value: `${CATALOG}${preset.catalog_id}`, label: `${preset.catalog_egg} (import from the egg catalog)` }] : []),
@@ -184,7 +186,20 @@ export default function GameDialog({ game, preset = null, eggs, pending, onClose
                         }} />
                     </div>
                     <p className='srvc:text-xs srvc:text-muted-foreground'>List one port per required port, primary first. If unavailable, the same spacing is used with other free ports on one IP. Empty uses consecutive ports or known egg defaults.</p>
-                    {!portsValid && <p className='srvc:text-xs srvc:text-destructive'>Enter distinct ports from 1 to 65535, one per required port.</p>}
+                    {!portsValid && (
+                        <div className='srvc:grid srvc:gap-1'>
+                            <p role='alert' className='srvc:text-xs srvc:text-destructive'>
+                                {portCountMismatch
+                                    ? `You entered ${input.default_ports.length} default ports, but Required ports is ${input.ports}. These counts must match.`
+                                    : 'Enter up to 10 distinct ports from 1 to 65535, separated by commas.'}
+                            </p>
+                            {portCountMismatch && (
+                                <Button.Text size='xsmall' onClick={() => set({ ports: input.default_ports.length })}>
+                                    Set required ports to {input.default_ports.length}
+                                </Button.Text>
+                            )}
+                        </div>
+                    )}
                 </div>
                 <div className='srvc:grid srvc:gap-2'>
                     <div>
