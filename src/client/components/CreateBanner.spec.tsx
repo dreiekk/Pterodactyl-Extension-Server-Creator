@@ -9,10 +9,19 @@ afterEach(cleanup);
 
 test('shows the create action with an unlimited server quota', async () => {
     const unlimited: api.Limits = { servers: -1, memory: -1, disk: -1, cpu: -1, databases: -1, backups: -1, allocations: -1 };
-    vi.mocked(api.getOverview).mockResolvedValue({ quota: { limits: unlimited, used: { ...unlimited, servers: 2 }, remaining: unlimited }, games: [{} as api.Game], servers: [] });
+    vi.mocked(api.getOverview).mockResolvedValue({ quota: { limits: unlimited, used: { ...unlimited, servers: 2 }, remaining: unlimited }, can_import_eggs: false, games: [{} as api.Game], servers: [] });
     const host = createExtensionTestHost({ extensionId: 'server-creator', prefix: 'srvc' });
     render(<CreateBanner />, { wrapper: host.Wrapper });
     expect(await screen.findByRole('button', { name: 'Create server' })).toBeTruthy();
     expect(screen.getByText(/unlimited servers/)).toBeTruthy();
+    host.dispose();
+});
+
+test('allows an authorized catalog user to reach the creator without predefined games', async () => {
+    const unlimited: api.Limits = { servers: -1, memory: -1, disk: -1, cpu: -1, databases: -1, backups: -1, allocations: -1 };
+    vi.mocked(api.getOverview).mockResolvedValue({ quota: { limits: unlimited, used: unlimited, remaining: unlimited }, can_import_eggs: true, games: [], servers: [] });
+    const host = createExtensionTestHost({ extensionId: 'server-creator', prefix: 'srvc' });
+    render(<CreateBanner />, { wrapper: host.Wrapper });
+    expect(await screen.findByRole('button', { name: 'Create server' })).toBeTruthy();
     host.dispose();
 });

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, PanelLink, Spinner, TitledGreyBox, httpErrorToHuman, toast, useCurrentResource } from '@pterodactyl/sdk';
-import { getAdminUser, keys, resetUserQuota, saveUserQuota, type AdminUser, type Limits, type Resource } from '../api';
+import { getAdminUser, keys, resetUserQuota, saveCatalogPermission, saveUserQuota, type AdminUser, type Limits, type Resource } from '../api';
 import QuotaFields from '../components/QuotaFields';
 import { LABELS, formatResource } from '../lib/format';
 
@@ -13,7 +13,7 @@ export default function UserTab() {
     const data = useQuery({ queryKey: keys.user(id), queryFn: () => getAdminUser(id), enabled: id > 0 });
     const [limits, setLimits] = useState<Limits | null>(null);
 
-    useEffect(() => data.data && setLimits(data.data.custom ?? data.data.quota.limits), [data.data]);
+    useEffect(() => data.data && setLimits(data.data.custom ?? data.data.quota.limits), [data.data?.custom, data.data?.quota.limits]);
 
     const update = (result: AdminUser) => {
         queryClient.setQueryData(keys.user(id), result);
@@ -22,6 +22,14 @@ export default function UserTab() {
     const onError = (error: unknown) => toast.error(httpErrorToHuman(error));
     const saving = useMutation({ mutationFn: () => saveUserQuota(id, limits!), onSuccess: (result) => (update(result), toast.success('Quota saved.')), onError });
     const resetting = useMutation({ mutationFn: () => resetUserQuota(id), onSuccess: (result) => (update(result), toast.success('This user uses the default quota again.')), onError });
+    const catalogPermission = useMutation({
+        mutationFn: (allowed: boolean) => saveCatalogPermission(id, allowed),
+        onSuccess: (result) => {
+            queryClient.setQueryData<AdminUser>(keys.user(id), (current) => current ? { ...current, can_import_eggs: result.can_import_eggs } : result);
+            toast.success('Egg import permission updated.');
+        },
+        onError,
+    });
 
     if (!data.data || !limits) {
         return data.isError ? <p className='srvc:text-sm srvc:text-destructive'>{httpErrorToHuman(data.error)}</p> : <Spinner centered size={Spinner.Size.LARGE} />;
@@ -46,6 +54,14 @@ export default function UserTab() {
                         </Button>
                     </div>
                 </TitledGreyBox>
+                <div className='srvc:mt-6'>
+                    <TitledGreyBox title='Egg catalog access'>
+                        <p className='srvc:mb-4 srvc:text-sm srvc:text-muted-foreground'>Allow this user to import catalog eggs for their own servers. Eggs can run their own installation scripts and container images; grant access only to trusted users. Revoking access does not remove existing servers.</p>
+                        <Button size='small' isLoading={catalogPermission.isPending} onClick={() => catalogPermission.mutate(!data.data.can_import_eggs)}>
+                            {data.data.can_import_eggs ? 'Revoke egg import access' : 'Allow egg imports'}
+                        </Button>
+                    </TitledGreyBox>
+                </div>
             </div>
             <TitledGreyBox title='In use'>
                 <div className='srvc:grid srvc:gap-2 srvc:text-sm'>

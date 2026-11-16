@@ -132,7 +132,7 @@ export default function AdminScreen() {
                                         ))}
                                     </ul>
                                 )}
-                                <UserSelect id='srvc-add-user' value={null} placeholder='Give a user their own quota' onChange={(user) => navigate({ extension: 'server-creator', screen: 'user-tab', params: { id: String(user.id) } })} />
+                                <UserSelect id='srvc-add-user' value={null} placeholder='Manage a user’s quota or egg access' onChange={(user) => navigate({ extension: 'server-creator', screen: 'user-tab', params: { id: String(user.id) } })} />
                             </TitledGreyBox>
                             <TitledGreyBox title='Locations'>
                                 <p className='srvc:mb-4 srvc:text-sm srvc:text-muted-foreground'>New servers go to a node with room in these locations. Leave empty for all public nodes.</p>

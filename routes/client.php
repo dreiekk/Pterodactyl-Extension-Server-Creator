@@ -7,3 +7,5 @@ use ServerCreator\Http\Controllers\ClientController;
 
 Route::get('/', [ClientController::class, 'index']);
 Route::post('/servers', [ClientController::class, 'store'])->middleware('throttle:5,1');
+Route::get('/catalog', [ClientController::class, 'catalog'])->middleware('throttle:30,1');
+Route::post('/catalog/import', [ClientController::class, 'importCatalog'])->middleware('throttle:5,1');

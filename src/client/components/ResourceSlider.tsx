@@ -9,6 +9,8 @@ interface Props {
     value: number;
     min: number;
     max: number;
+    /** Maximum allowed for exact input when the visible slider covers a smaller range. */
+    entryMax?: number;
     onChange: (value: number) => void;
     /** What the plan still has for this server, and the plan's total. */
     quota?: { available: number; limit: number };
@@ -31,7 +33,7 @@ function placed(at: number) {
 }
 
 /** A memory, disk or CPU picker that reads in GiB and cores but works in the API's MiB and percent. */
-export default function ResourceSlider({ id, resource, label, value, min, max, onChange, quota, suggest = false }: Props) {
+export default function ResourceSlider({ id, resource, label, value, min, max, entryMax = max, onChange, quota, suggest = false }: Props) {
     const [draft, setDraft] = useState<string | null>(null);
     const fixed = max <= min;
     const scale = scaleFor(resource, min, max);
@@ -47,7 +49,7 @@ export default function ResourceSlider({ id, resource, label, value, min, max, o
         const parsed = draft === null ? null : parseSize(resource, draft);
 
         setDraft(null);
-        parsed !== null && onChange(clamp(parsed, min, max));
+        parsed !== null && onChange(clamp(parsed, min, entryMax));
     };
 
     return (

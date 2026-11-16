@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace ServerCreator\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Pterodactyl\Models\Egg;
@@ -51,6 +52,17 @@ final class Game extends Model
     public function egg(): BelongsTo
     {
         return $this->belongsTo(Egg::class);
+    }
+
+    /** Public games and this user's private games, when they have catalog access. */
+    public function scopeAvailableTo(Builder $query, int $userId, bool $canImport): void
+    {
+        $query->where(static function (Builder $query) use ($userId, $canImport): void {
+            $query->whereNull('owner_id');
+            if ($canImport) {
+                $query->orWhere('owner_id', $userId);
+            }
+        });
     }
 
     /** A custom image wins over Steam artwork. */

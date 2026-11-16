@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Input, Label, PageContentBlock, Spinner, TitledGreyBox, httpErrorToHuman, toast, usePanelNavigate } from '@pterodactyl/sdk';
 import { createServer, getOverview, keys, type Game, type Limits } from '../api';
 import Artwork from '../components/Artwork';
+import CatalogPicker from '../components/CatalogPicker';
 import ResourceSlider from '../components/ResourceSlider';
 import { remainingText } from '../lib/format';
 import { SIZED, range, shortfall } from '../lib/games';
@@ -17,10 +18,11 @@ export default function CreateScreen() {
     const [name, setName] = useState('');
     const [sizes, setSizes] = useState<Record<Sized, number>>({ memory: 0, disk: 0, cpu: 0 });
     const [environment, setEnvironment] = useState<Record<string, string>>({});
+    const [features, setFeatures] = useState({ databases: 0, backups: 0, allocations: 0 });
     const setup = useRef<HTMLElement>(null);
 
     const creation = useMutation({
-        mutationFn: () => createServer({ game: game!.id, name: name.trim(), ...sizes, environment }),
+        mutationFn: () => createServer({ game: game!.id, name: name.trim(), ...sizes, environment, ...(game?.private ? features : {}) }),
         onSuccess: ({ identifier }) => {
             toast.success('Server created. It is being installed now.');
             queryClient.invalidateQueries({ queryKey: keys.overview });
@@ -34,6 +36,7 @@ export default function CreateScreen() {
         setName((current) => (current === '' || current === game?.name ? picked.name : current));
         setSizes({ memory: range(picked, remaining, 'memory').min, disk: range(picked, remaining, 'disk').min, cpu: range(picked, remaining, 'cpu').min });
         setEnvironment(Object.fromEntries((picked.variables ?? []).map((variable) => [variable.key, variable.default])));
+        setFeatures({ databases: 0, backups: 0, allocations: 0 });
         // On phones the setup step starts below the game list, so bring it into view.
         requestAnimationFrame(() => {
             const top = setup.current?.getBoundingClientRect().top;
@@ -51,7 +54,8 @@ export default function CreateScreen() {
 
     const { remaining, limits } = overview.data.quota;
     const noServers = remaining.servers !== UNLIMITED && remaining.servers < 1;
-    const valid = game !== null && name.trim() !== '' && SIZED.every(({ key }) => sizes[key] >= range(game, remaining, key).min && sizes[key] <= range(game, remaining, key).max);
+    const valid = game !== null && name.trim() !== '' && SIZED.every(({ key }) => sizes[key] >= range(game, remaining, key).min && sizes[key] <= range(game, remaining, key).max)
+        && (!game.private || (Object.keys(features) as (keyof typeof features)[]).every((key) => Number.isInteger(features[key]) && features[key] >= 0 && features[key] <= 2147483647 && (remaining[key] === UNLIMITED || features[key] <= remaining[key])));
 
     return (
         <PageContentBlock title='Create server'>
@@ -60,12 +64,14 @@ export default function CreateScreen() {
                 <p className='srvc:mt-1 srvc:text-sm srvc:leading-relaxed srvc:text-foreground/70'>{remainingText(remaining)}</p>
             </header>
 
-            {overview.data.games.length === 0 || noServers ? (
+            {noServers ? (
                 <p className='srvc:py-8 srvc:text-center srvc:text-sm srvc:text-muted-foreground'>{noServers ? 'Delete a server or ask an administrator for a higher limit.' : 'There are no games to choose from yet.'}</p>
             ) : (
                 <div className='srvc:grid srvc:gap-6'>
                     <section>
                         <h2 className='srvc:mb-3 srvc:font-header srvc:text-sm srvc:font-semibold srvc:uppercase srvc:tracking-wide srvc:text-foreground'>1. Pick a game</h2>
+                        {overview.data.can_import_eggs && <CatalogPicker onImported={(imported) => pick(imported, remaining)} />}
+                        {overview.data.games.length === 0 && !overview.data.can_import_eggs && <p className='srvc:py-8 srvc:text-center srvc:text-sm srvc:text-muted-foreground'>There are no games to choose from yet.</p>}
                         <div className='srvc:grid srvc:grid-cols-2 srvc:gap-3 srvc:sm:gap-4 srvc:lg:grid-cols-4'>
                             {overview.data.games.map((item) => {
                                 const blocked = shortfall(item, remaining);
@@ -109,6 +115,7 @@ export default function CreateScreen() {
                                         </div>
                                         {SIZED.map(({ key, label }) => {
                                             const { min, max } = range(game, remaining, key);
+                                            const visibleMax = game.private ? Math.min(max, Math.max({ memory: 8192, disk: 51200, cpu: 800 }[key], sizes[key] * 2, min)) : max;
 
                                             return (
                                                 <ResourceSlider
@@ -118,13 +125,28 @@ export default function CreateScreen() {
                                                     label={label}
                                                     value={sizes[key]}
                                                     min={min}
-                                                    max={max}
+                                                    max={visibleMax}
+                                                    entryMax={max}
                                                     onChange={(value) => setSizes((current) => ({ ...current, [key]: value }))}
                                                     quota={{ available: remaining[key], limit: limits[key] }}
                                                     suggest
                                                 />
                                             );
                                         })}
+                                        {game.private && ([
+                                            ['databases', 'Databases'],
+                                            ['backups', 'Backups'],
+                                            ['allocations', 'Extra ports'],
+                                        ] as const).map(([key, label]) => (
+                                            <div key={key}>
+                                                <Label htmlFor={`srvc-feature-${key}`}>{label}</Label>
+                                                <Input id={`srvc-feature-${key}`} type='number' min={0} max={remaining[key] === UNLIMITED ? 2147483647 : remaining[key]} value={features[key]} onChange={(event) => {
+                                                    const value = Number(event.currentTarget.value);
+                                                    setFeatures((current) => ({ ...current, [key]: value }));
+                                                }} />
+                                                <p className='srvc:text-xs srvc:text-muted-foreground'>{remaining[key] === UNLIMITED ? 'Unlimited total quota' : `${remaining[key]} available in your quota`}</p>
+                                            </div>
+                                        ))}
                                     </div>
                                 </TitledGreyBox>
                                 <TitledGreyBox title='Settings' className='srvc:flex srvc:flex-col' contentClassName='srvc:flex srvc:flex-1 srvc:flex-col srvc:gap-6'>

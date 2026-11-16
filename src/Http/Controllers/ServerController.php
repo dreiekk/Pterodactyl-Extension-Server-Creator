@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Pterodactyl\Models\Server;
 use ServerCreator\Exceptions\CreatorException;
 use ServerCreator\Http\Presenter;
+use ServerCreator\Models\CatalogPermission;
 use ServerCreator\Models\Game;
 use ServerCreator\Models\OwnedServer;
 use ServerCreator\Panel\Panel;
@@ -60,7 +61,7 @@ final class ServerController
             ]])->all(),
             'remaining' => $available,
             'games' => $this->settings->allowSwitch()
-                ? Game::query()->with('egg:id,name')->where('enabled', true)->whereKeyNot($game?->id ?? 0)->orderBy('sort')->orderBy('name')->get()->map(static fn (Game $item): array => Presenter::game($item))->all()
+                ? Game::query()->availableTo($user->id, CatalogPermission::query()->whereKey($user->id)->exists())->with('egg:id,name')->where('enabled', true)->whereKeyNot($game?->id ?? 0)->orderBy('sort')->orderBy('name')->get()->map(static fn (Game $item): array => Presenter::game($item))->all()
                 : [],
         ]);
     }
@@ -93,7 +94,8 @@ final class ServerController
             'reinstall' => ['required', 'boolean'],
         ]);
 
-        $game = Game::query()->with('egg')->where('enabled', true)->find((int) $data['game']) ?? throw new CreatorException('This game cannot be picked.', 422);
+        $user = $request->user();
+        $game = Game::query()->availableTo($user->id, CatalogPermission::query()->whereKey($user->id)->exists())->with('egg')->where('enabled', true)->find((int) $data['game']) ?? throw new CreatorException('This game cannot be picked.', 422);
 
         $this->manager->switchGame($request->user(), $server, $game, [
             'memory' => (int) $data['memory'],

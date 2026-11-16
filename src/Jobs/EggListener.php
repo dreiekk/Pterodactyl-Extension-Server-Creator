@@ -8,6 +8,7 @@ use Pterodactyl\Contracts\Servers\ChangesServerEgg;
 use Pterodactyl\Exceptions\Service\Deployment\NoViableAllocationException;
 use Pterodactyl\Models\Egg;
 use Pterodactyl\Models\Server;
+use ServerCreator\Models\CatalogPermission;
 use ServerCreator\Models\Game;
 use ServerCreator\Models\OwnedServer;
 use ServerCreator\Services\ServerManager;
@@ -32,7 +33,7 @@ final readonly class EggListener implements ChangesServerEgg
 
         $game = $owned->game?->egg_id === $egg->id
             ? $owned->game
-            : Game::query()->where('egg_id', $egg->id)->where('enabled', true)->orderBy('sort')->orderBy('name')->first() ?? $owned->game;
+            : Game::query()->availableTo($owned->user_id, CatalogPermission::query()->whereKey($owned->user_id)->exists())->where('egg_id', $egg->id)->where('enabled', true)->orderBy('sort')->orderBy('name')->first() ?? $owned->game;
 
         if ($game === null) {
             return $server;

@@ -14,6 +14,7 @@ final class Presenter
     {
         $data = [
             'id' => $game->id,
+            'private' => $game->owner_id !== null,
             'egg_id' => $game->egg_id,
             'egg' => $game->egg?->name,
             'name' => $game->name,

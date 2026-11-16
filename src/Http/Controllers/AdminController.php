@@ -13,6 +13,7 @@ use Pterodactyl\Models\Location;
 use Pterodactyl\Models\Server;
 use Pterodactyl\Models\User;
 use ServerCreator\Http\Presenter;
+use ServerCreator\Models\CatalogPermission;
 use ServerCreator\Models\Copy;
 use ServerCreator\Models\Game;
 use ServerCreator\Models\OwnedServer;
@@ -31,7 +32,7 @@ final class AdminController
 
     public function index(): JsonResponse
     {
-        $games = Game::query()->with('egg:id,name')->orderBy('sort')->orderBy('name')->get();
+        $games = Game::query()->whereNull('owner_id')->with('egg:id,name')->orderBy('sort')->orderBy('name')->get();
         $eggs = $this->panel->eggs();
 
         return new JsonResponse([
@@ -68,14 +69,14 @@ final class AdminController
 
     public function updateGame(Request $request, int $id): JsonResponse
     {
-        Game::query()->findOrFail($id)->update($this->validatedGame($request));
+        Game::query()->whereNull('owner_id')->findOrFail($id)->update($this->validatedGame($request));
 
         return $this->index();
     }
 
     public function destroyGame(int $id): JsonResponse
     {
-        Game::query()->findOrFail($id)->delete();
+        Game::query()->whereNull('owner_id')->findOrFail($id)->delete();
 
         return $this->index();
     }
@@ -113,6 +114,7 @@ final class AdminController
 
         return new JsonResponse([
             'custom' => $own?->limits(),
+            'can_import_eggs' => CatalogPermission::query()->whereKey($user->id)->exists(),
             'quota' => $this->quotas->summary($user),
             'servers' => OwnedServer::query()->with(['server' => static fn ($query) => $query->without('allocation')->select(['id', 'name']), 'game:id,name'])->where('user_id', $user->id)->get()->map(static fn (OwnedServer $owned): array => [
                 'id' => $owned->server->id,
@@ -133,6 +135,19 @@ final class AdminController
     public function resetUser(int $id): JsonResponse
     {
         QuotaLimit::query()->where('user_id', $id)->delete();
+
+        return $this->user($id);
+    }
+
+    public function updateCatalogPermission(Request $request, int $id): JsonResponse
+    {
+        $user = User::query()->findOrFail($id);
+        $data = $request->validate(['allowed' => ['required', 'boolean']]);
+        if ($data['allowed']) {
+            CatalogPermission::query()->firstOrCreate(['user_id' => $user->id]);
+        } else {
+            CatalogPermission::query()->whereKey($user->id)->delete();
+        }
 
         return $this->user($id);
     }

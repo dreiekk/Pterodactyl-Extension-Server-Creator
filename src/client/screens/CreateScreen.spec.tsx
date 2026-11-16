@@ -46,7 +46,7 @@ function renderScreen() {
 }
 
 test('offers games that fit and fills in their defaults', async () => {
-    vi.mocked(api.getOverview).mockResolvedValue({ quota: { limits: limits(2, 6144), used: limits(0, 0), remaining: limits(2, 3072) }, games: [game(1, 'Paper', 1024), game(2, 'Rust', 4096)], servers: [] });
+    vi.mocked(api.getOverview).mockResolvedValue({ quota: { limits: limits(2, 6144), used: limits(0, 0), remaining: limits(2, 3072) }, can_import_eggs: false, games: [game(1, 'Paper', 1024), game(2, 'Rust', 4096)], servers: [] });
     const host = renderScreen();
 
     expect(await screen.findByText(/You can create 2 more servers/)).toBeTruthy();
@@ -63,7 +63,7 @@ test('offers games that fit and fills in their defaults', async () => {
 });
 
 test('picks sizes with sliders and presets but sends MiB and percent', async () => {
-    vi.mocked(api.getOverview).mockResolvedValue({ quota: { limits: limits(2, 6144), used: limits(0, 0), remaining: limits(2, 3072) }, games: [game(1, 'Paper', 1024)], servers: [] });
+    vi.mocked(api.getOverview).mockResolvedValue({ quota: { limits: limits(2, 6144), used: limits(0, 0), remaining: limits(2, 3072) }, can_import_eggs: false, games: [game(1, 'Paper', 1024)], servers: [] });
     vi.mocked(api.createServer).mockResolvedValue({ identifier: 'abcd1234' });
     const host = renderScreen();
 
@@ -82,7 +82,7 @@ test('picks sizes with sliders and presets but sends MiB and percent', async () 
 });
 
 test('shows a size the plan pins as a locked slider', async () => {
-    vi.mocked(api.getOverview).mockResolvedValue({ quota: { limits: limits(2, 6144), used: limits(0, 0), remaining: limits(2, 3072) }, games: [game(1, 'Paper', 1024, 100)], servers: [] });
+    vi.mocked(api.getOverview).mockResolvedValue({ quota: { limits: limits(2, 6144), used: limits(0, 0), remaining: limits(2, 3072) }, can_import_eggs: false, games: [game(1, 'Paper', 1024, 100)], servers: [] });
     const host = renderScreen();
 
     fireEvent.click(await screen.findByRole('button', { name: /Paper/ }));
@@ -94,7 +94,7 @@ test('shows a size the plan pins as a locked slider', async () => {
 });
 
 test('explains when the quota is used up', async () => {
-    vi.mocked(api.getOverview).mockResolvedValue({ quota: { limits: limits(1, 2048), used: limits(1, 2048), remaining: limits(0, 0) }, games: [game(1, 'Paper', 1024)], servers: [] });
+    vi.mocked(api.getOverview).mockResolvedValue({ quota: { limits: limits(1, 2048), used: limits(1, 2048), remaining: limits(0, 0) }, can_import_eggs: false, games: [game(1, 'Paper', 1024)], servers: [] });
     const host = renderScreen();
 
     expect(await screen.findByText('You have used all of your servers.')).toBeTruthy();
@@ -104,7 +104,7 @@ test('explains when the quota is used up', async () => {
 
 test('allows unlimited total quota while keeping game size caps', async () => {
     const unlimited: api.Limits = { servers: -1, memory: -1, disk: -1, cpu: -1, databases: -1, backups: -1, allocations: -1 };
-    vi.mocked(api.getOverview).mockResolvedValue({ quota: { limits: unlimited, used: limits(0, 0), remaining: unlimited }, games: [{ ...game(1, 'Paper', 1024), backups: 1 }], servers: [] });
+    vi.mocked(api.getOverview).mockResolvedValue({ quota: { limits: unlimited, used: limits(0, 0), remaining: unlimited }, can_import_eggs: false, games: [{ ...game(1, 'Paper', 1024), backups: 1 }], servers: [] });
     const host = renderScreen();
 
     expect(await screen.findByText(/unlimited servers/)).toBeTruthy();
@@ -112,5 +112,34 @@ test('allows unlimited total quota while keeping game size caps', async () => {
     expect(screen.getAllByText('Unlimited quota')).toHaveLength(3);
     expect(screen.getByText('4 GiB')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Create server' })).toBeTruthy();
+    host.dispose();
+});
+
+test('lets private egg servers choose feature limits within remaining quota', async () => {
+    const available = { ...limits(2, 6144), databases: 2, backups: 3, allocations: 4 };
+    vi.mocked(api.getOverview).mockResolvedValue({ quota: { limits: available, used: limits(0, 0), remaining: available }, can_import_eggs: true, games: [{ ...game(1, 'Custom', 1024), private: true }], servers: [] });
+    vi.mocked(api.createServer).mockResolvedValue({ identifier: 'abcd1234' });
+    const host = renderScreen();
+    fireEvent.click(await screen.findByRole('button', { name: /Custom/ }));
+    fireEvent.change(screen.getByLabelText('Backups'), { target: { value: '4' } });
+    expect((screen.getByRole('button', { name: 'Create server' }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText('Backups'), { target: { value: '3' } });
+    fireEvent.change(screen.getByLabelText('Databases'), { target: { value: '2' } });
+    fireEvent.change(screen.getByLabelText('Extra ports'), { target: { value: '4' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create server' }));
+    await vi.waitFor(() => expect(api.createServer).toHaveBeenCalledWith(expect.objectContaining({ databases: 2, backups: 3, allocations: 4 })));
+    host.dispose();
+});
+
+test('keeps the private egg slider usable with unlimited quota while accepting larger exact sizes', async () => {
+    const unlimited: api.Limits = { servers: -1, memory: -1, disk: -1, cpu: -1, databases: -1, backups: -1, allocations: -1 };
+    vi.mocked(api.getOverview).mockResolvedValue({ quota: { limits: unlimited, used: limits(0, 0), remaining: unlimited }, can_import_eggs: true, games: [{ ...game(1, 'Custom', 64), private: true, memory_max: 2147483647 }], servers: [] });
+    const host = renderScreen();
+    fireEvent.click(await screen.findByRole('button', { name: /Custom/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Memory: 64 MiB/ }));
+    const input = screen.getByLabelText('Memory in GiB');
+    fireEvent.change(input, { target: { value: '32' } });
+    fireEvent.blur(input);
+    expect(screen.getByRole('slider', { name: 'Memory' }).getAttribute('aria-valuetext')).toBe('32 GiB');
     host.dispose();
 });

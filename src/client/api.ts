@@ -13,6 +13,7 @@ export interface Variable {
 
 export interface Game {
     id: number;
+    private?: boolean;
     egg_id: number;
     egg: string | null;
     name: string;
@@ -62,6 +63,7 @@ export interface QuotaSummary {
 
 export interface Overview {
     quota: QuotaSummary;
+    can_import_eggs: boolean;
     games: Game[];
     servers: { identifier: string; name: string; game: string | null }[];
 }
@@ -73,6 +75,24 @@ export interface CreateInput {
     disk: number;
     cpu: number;
     environment: Record<string, string>;
+    databases?: number;
+    backups?: number;
+    allocations?: number;
+}
+
+export interface CatalogEgg {
+    id: string;
+    name: string;
+    description: string;
+    category: string;
+    source_url: string;
+}
+
+export interface CatalogImport {
+    catalog_id: string;
+    ports: number;
+    default_ports: number[];
+    port_variables: string[];
 }
 
 export interface OwnedServer {
@@ -124,6 +144,7 @@ export interface Admin {
 
 export interface AdminUser {
     custom: Limits | null;
+    can_import_eggs: boolean;
     quota: QuotaSummary;
     servers: { id: number; name: string; game: string | null }[];
 }
@@ -143,6 +164,7 @@ const admin = '/api/admin/extensions/server-creator';
 
 export const keys = {
     overview: ['server-creator', 'overview'] as const,
+    catalog: ['server-creator', 'catalog'] as const,
     server: (id: string) => ['server-creator', 'server', id] as const,
     allocations: (id: string) => ['server-creator', 'allocations', id] as const,
     admin: ['server-creator', 'admin'] as const,
@@ -154,6 +176,8 @@ export const keys = {
 
 export const getOverview = async () => (await http.get<Overview>(client)).data;
 export const createServer = async (input: CreateInput) => (await http.post<{ identifier: string }>(`${client}/servers`, input)).data;
+export const getCatalog = async () => (await http.get<{ eggs: CatalogEgg[] }>(`${client}/catalog`)).data.eggs;
+export const importCatalogEgg = async (input: CatalogImport) => (await http.post<{ game: Game }>(`${client}/catalog/import`, input)).data.game;
 
 export const getOwnedServer = async (id: string) => (await http.get<OwnedServer>(server(id))).data;
 export const resizeServer = async (id: string, resources: { memory: number; disk: number; cpu: number }) => (await http.put<OwnedServer>(server(id), resources)).data;
@@ -174,6 +198,7 @@ export const searchUsers = async (query: string) => (await http.get<{ users: { i
 export const getAdminUser = async (id: number) => (await http.get<AdminUser>(`${admin}/users/${id}`)).data;
 export const saveUserQuota = async (id: number, limits: Limits) => (await http.put<AdminUser>(`${admin}/users/${id}/quota`, limits)).data;
 export const resetUserQuota = async (id: number) => (await http.delete<AdminUser>(`${admin}/users/${id}/quota`)).data;
+export const saveCatalogPermission = async (id: number, allowed: boolean) => (await http.put<AdminUser>(`${admin}/users/${id}/catalog-permission`, { allowed })).data;
 export const searchSteam = async (term: string) => (await http.get<{ results: { id: number; name: string; image: string }[] }>(`${admin}/steam`, { params: { term } })).data.results;
 export const duplicateServer = async (id: number, input: { name: string; owner: number; files: boolean }) => (await http.post<{ id: number; identifier: string }>(`${admin}/servers/${id}/duplicate`, input)).data;
 export const getCopies = async (id: number) => (await http.get<{ copies: Copy[] }>(`${admin}/servers/${id}/copies`)).data.copies;

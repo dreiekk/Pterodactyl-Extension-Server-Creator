@@ -27,13 +27,13 @@ final readonly class ServerManager
 
     public function __construct(private Panel $panel, private Quotas $quotas) {}
 
-    /** @param array{name: string, memory: int, disk: int, cpu: int, environment: array<string, string>} $input */
+    /** @param array{name: string, memory: int, disk: int, cpu: int, environment: array<string, string>, databases?: int, backups?: int, allocations?: int} $input */
     public function create(User $user, Game $game, array $input): Server
     {
         $this->assertWithin($game, $input);
 
         return Cache::lock("ext:server-creator:user:{$user->id}", 60)->block(15, function () use ($user, $game, $input): Server {
-            $resources = ['memory' => $input['memory'], 'disk' => $input['disk'], 'cpu' => $input['cpu'], 'databases' => $game->databases, 'backups' => $game->backups, 'allocations' => $game->allocations];
+            $resources = ['memory' => $input['memory'], 'disk' => $input['disk'], 'cpu' => $input['cpu'], 'databases' => $input['databases'] ?? $game->databases, 'backups' => $input['backups'] ?? $game->backups, 'allocations' => $input['allocations'] ?? $game->allocations];
             $this->assertQuota($this->quotas->for($user)->exceeded($resources, $this->quotas->used($user)));
 
             $egg = $game->egg;
@@ -63,9 +63,9 @@ final readonly class ServerManager
                     'oom_disabled' => true,
                     'skip_scripts' => false,
                     'start_on_completion' => true,
-                    'database_limit' => $game->databases,
-                    'allocation_limit' => $game->allocations,
-                    'backup_limit' => $game->backups,
+                    'database_limit' => $resources['databases'],
+                    'allocation_limit' => $resources['allocations'],
+                    'backup_limit' => $resources['backups'],
                 ], $this->panel->locations(), $allocations);
             } catch (NoViableNodeException|NoViableAllocationException) {
                 throw new CreatorException('No node has room for this server right now. Try smaller resources or ask an administrator.');

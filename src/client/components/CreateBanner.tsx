@@ -9,7 +9,7 @@ export default function CreateBanner() {
     const navigate = usePanelNavigate();
     const overview = useQuery({ queryKey: keys.overview, queryFn: getOverview, staleTime: 30_000, retry: false });
 
-    if (!overview.data || (overview.data.quota.limits.servers !== UNLIMITED && overview.data.quota.limits.servers < 1) || overview.data.games.length === 0) {
+    if (!overview.data || (overview.data.quota.limits.servers !== UNLIMITED && overview.data.quota.limits.servers < 1) || (overview.data.games.length === 0 && !overview.data.can_import_eggs)) {
         return null;
     }
 
