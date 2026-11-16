@@ -3,7 +3,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Dialog, PageContentBlock, PanelLink, Select, ServerError, Spinner, TitledGreyBox, httpErrorToHuman, toast, usePanelNavigate } from '@pterodactyl/sdk';
 import { deleteGame, getAdmin, keys, saveDefaultQuota, saveGame, saveLocations, type Admin, type Game, type GameInput, type Limits, type PopularGame } from '../api';
 import Artwork from '../components/Artwork';
-import AuditLog from '../components/AuditLog';
 import GameDialog from '../components/GameDialog';
 import QuotaFields from '../components/QuotaFields';
 import UserSelect from '../components/UserSelect';
@@ -45,6 +44,7 @@ export default function AdminScreen() {
                     <p className='srvc:mt-1 srvc:text-sm srvc:leading-relaxed srvc:text-foreground/70'>Games users can create servers from, and how much they may use.</p>
                 </div>
                 <div className='srvc:flex srvc:shrink-0 srvc:items-center srvc:gap-3'>
+                    <PanelLink destination={{ extension: 'server-creator', screen: 'audit' }} className='srvc:text-sm srvc:text-primary srvc:hover:underline'>View audit log</PanelLink>
                     {data.data && data.data.eggs.length === 0 && <p className='srvc:text-xs srvc:text-muted-foreground'>Create an egg in the panel first.</p>}
                     <Button disabled={!data.data?.eggs.length} onClick={() => setEditing('new')}>
                         Add game
@@ -148,7 +148,6 @@ export default function AdminScreen() {
                                 </div>
                             </TitledGreyBox>
                         </div>
-                        <AuditLog />
                     </div>
                 </div>
             )}

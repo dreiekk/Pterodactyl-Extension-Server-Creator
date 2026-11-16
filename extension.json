@@ -44,6 +44,11 @@
                 }
             },
             {
+                "id": "audit",
+                "area": "admin",
+                "path": "server-creator-audit"
+            },
+            {
                 "id": "user-tab",
                 "area": "admin",
                 "parent": "admin.user",
