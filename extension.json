@@ -49,6 +49,11 @@
                 "path": "server-creator-audit"
             },
             {
+                "id": "imported-games",
+                "area": "admin",
+                "path": "server-creator-imported-games"
+            },
+            {
                 "id": "user-tab",
                 "area": "admin",
                 "parent": "admin.user",

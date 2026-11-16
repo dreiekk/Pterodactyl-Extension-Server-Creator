@@ -74,8 +74,14 @@ final class AuditTest extends TestCase
 }
 
 if (class_exists(\Illuminate\Database\Eloquent\Model::class)) {
-    class AuditTestUser extends \Illuminate\Database\Eloquent\Model {}
+    class AuditTestUser extends \Illuminate\Database\Eloquent\Model
+    {
+        protected $table = 'users';
+    }
 } elseif (($autoload = getenv('SERVER_CREATOR_LARAVEL_AUTOLOAD')) && is_file($autoload)) {
     require_once $autoload;
-    class AuditTestUser extends \Illuminate\Database\Eloquent\Model {}
+    class AuditTestUser extends \Illuminate\Database\Eloquent\Model
+    {
+        protected $table = 'users';
+    }
 }

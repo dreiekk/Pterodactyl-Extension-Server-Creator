@@ -144,14 +144,18 @@ final class ClientController
                 if (! $mapping) {
                     Activity::event('admin:egg.import')->subject($egg)->property(['name' => $egg->name, 'catalog_id' => $entry->id, 'via' => 'server-creator'])->log();
                 }
-                $this->audit->record($user, 'catalog.selected', $entry->name, [
-                    'catalog_id' => $entry->id, 'egg_id' => $egg->id, 'game_id' => $game->id,
-                    'egg_imported' => ! $mapping, 'profile_created' => $game->wasRecentlyCreated,
-                ]);
+                if ($game->enabled) {
+                    $this->audit->record($user, 'catalog.selected', $entry->name, [
+                        'catalog_id' => $entry->id, 'egg_id' => $egg->id, 'game_id' => $game->id,
+                        'egg_imported' => ! $mapping, 'profile_created' => $game->wasRecentlyCreated,
+                    ]);
+                }
 
                 return $game;
             });
         });
+
+        $game->ensureCatalogSelectable();
 
         return new JsonResponse(['game' => Presenter::game($game->load('egg'), true)], 201);
     }

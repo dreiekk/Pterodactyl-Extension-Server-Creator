@@ -89,6 +89,79 @@ final class AdminController
         return $this->index();
     }
 
+    public function importedGames(): JsonResponse
+    {
+        $games = Game::query()->whereNotNull('owner_id')->with(['egg:id,name', 'owner:id,username'])->orderBy('id')->get();
+
+        return new JsonResponse(['games' => $games->map(static fn (Game $game): array => Presenter::game($game) + [
+            'owner_id' => $game->owner_id,
+            'owner_name' => $game->owner->username,
+        ])]);
+    }
+
+    public function updateImportedGame(Request $request, int $id): JsonResponse
+    {
+        $game = Game::query()->whereNotNull('owner_id')->with('egg')->findOrFail($id);
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:191'],
+            'description' => ['nullable', 'string', 'max:1000'],
+            'enabled' => ['required', 'boolean'],
+            'memory_min' => ['required', 'integer', 'min:64', 'max:2147483647'],
+            'memory_max' => ['required', 'integer', 'gte:memory_min', 'max:2147483647'],
+            'disk_min' => ['required', 'integer', 'min:128', 'max:2147483647'],
+            'disk_max' => ['required', 'integer', 'gte:disk_min', 'max:2147483647'],
+            'cpu_min' => ['required', 'integer', 'min:10', 'max:2147483647'],
+            'cpu_max' => ['required', 'integer', 'gte:cpu_min', 'max:2147483647'],
+            'ports' => ['required', 'integer', 'min:1', 'max:10'],
+            'default_ports' => ['present', 'array', 'list', 'max:10'],
+            'default_ports.*' => ['required', 'integer', 'distinct', 'min:1', 'max:65535'],
+            'port_variables' => ['present', 'array', 'list', 'max:9'],
+            'port_variables.*' => ['required', 'string', 'distinct', 'regex:/^[A-Za-z0-9_]{1,191}$/'],
+            'port_range' => ['nullable', 'string', 'max:191', static function (string $attribute, mixed $value, Closure $fail): void {
+                if (Ports::ranges((string) $value) === null) {
+                    $fail('Enter ports and ranges like 25565-25600, 27015.');
+                }
+            }],
+        ]);
+        if ($data['default_ports'] !== [] && count($data['default_ports']) !== (int) $data['ports']) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['default_ports' => 'Enter one default port for each required port.']);
+        }
+        if (count($data['port_variables']) > (int) $data['ports'] - 1) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['port_variables' => 'Only secondary ports can have variables.']);
+        }
+        $editable = $game->egg->variables()->where('user_viewable', true)->where('user_editable', true)->pluck('env_variable')->all();
+        if (array_diff($data['port_variables'], $editable) !== []) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['port_variables' => 'Secondary port variables must be editable variables provided by this egg.']);
+        }
+        $data['default_ports'] = array_map(intval(...), $data['default_ports']);
+        $data['port_range'] = Ports::format(Ports::ranges((string) ($data['port_range'] ?? '')) ?? []) ?: null;
+        $before = $game->only(array_keys($data));
+        $game->update($data);
+        $this->audit->record($request->user(), 'imported_game.updated', $game->name, ['game_id' => $game->id, 'owner_id' => $game->owner_id, 'egg_id' => $game->egg_id, 'before' => $before, 'after' => $game->only(array_keys($data))]);
+
+        return $this->importedGames();
+    }
+
+    public function destroyImportedGame(Request $request, int $id): JsonResponse
+    {
+        $game = Game::query()->whereNotNull('owner_id')->findOrFail($id);
+        $game->delete();
+        $this->audit->record($request->user(), 'imported_game.deleted', $game->name, ['game_id' => $game->id, 'owner_id' => $game->owner_id, 'egg_id' => $game->egg_id]);
+
+        return $this->importedGames();
+    }
+
+    public function enableImportedGame(Request $request, int $id): JsonResponse
+    {
+        $game = Game::query()->whereNotNull('owner_id')->findOrFail($id);
+        $data = $request->validate(['enabled' => ['required', 'boolean']]);
+        $before = $game->enabled;
+        $game->update($data);
+        $this->audit->record($request->user(), 'imported_game.updated', $game->name, ['game_id' => $game->id, 'owner_id' => $game->owner_id, 'egg_id' => $game->egg_id, 'before' => ['enabled' => $before], 'after' => ['enabled' => $game->enabled]]);
+
+        return $this->importedGames();
+    }
+
     public function updateQuota(Request $request): JsonResponse
     {
         $limits = $this->validatedQuota($request);

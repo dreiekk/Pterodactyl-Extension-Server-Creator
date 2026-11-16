@@ -25,6 +25,7 @@ interface Props {
     pending: boolean;
     onClose: () => void;
     onSave: (input: GameInput) => void;
+    privateProfile?: boolean;
 }
 
 const CATALOG = 'catalog:';
@@ -59,7 +60,7 @@ function fromPreset(preset: PopularGame, eggs: Admin['eggs']): GameInput {
     return { ...blank(eggs), ...preset, catalog_id: preset.egg_id === null ? preset.catalog_id : null };
 }
 
-export default function GameDialog({ game, preset = null, eggs, pending, onClose, onSave }: Props) {
+export default function GameDialog({ game, preset = null, eggs, pending, onClose, onSave, privateProfile = false }: Props) {
     const [input, setInput] = useState<GameInput>(() => game ?? (preset ? fromPreset(preset, eggs) : blank(eggs)));
     const [portNames, setPortNames] = useState(input.port_variables.join(', '));
     const [defaultPorts, setDefaultPorts] = useState(input.default_ports.join(', '));
@@ -82,7 +83,7 @@ export default function GameDialog({ game, preset = null, eggs, pending, onClose
             <div className='srvc:grid srvc:gap-4'>
                 <div className='srvc:grid srvc:gap-4 srvc:sm:grid-cols-[minmax(0,1fr)_10rem]'>
                     <div className='srvc:grid srvc:content-start srvc:gap-4'>
-                        <div>
+                        {!privateProfile && <div>
                             <Label htmlFor='srvc-egg'>Egg</Label>
                             <Select
                                 id='srvc-egg'
@@ -92,7 +93,8 @@ export default function GameDialog({ game, preset = null, eggs, pending, onClose
                                 }
                                 options={eggOptions}
                             />
-                        </div>
+                        </div>}
+                        {privateProfile && <p className='srvc:text-sm srvc:text-muted-foreground'>Egg: {game?.egg}. Changing these settings also changes the rules used when existing servers are resized or their ports are managed.</p>}
                         <div>
                             <Label htmlFor='srvc-game-name'>Name</Label>
                             <Input id='srvc-game-name' value={input.name} maxLength={191} onChange={(event) => set({ name: event.currentTarget.value })} />
@@ -104,7 +106,7 @@ export default function GameDialog({ game, preset = null, eggs, pending, onClose
                     <Label htmlFor='srvc-description'>Description</Label>
                     <Input id='srvc-description' value={input.description ?? ''} maxLength={1000} onChange={(event) => set({ description: event.currentTarget.value || null })} />
                 </div>
-                <div className='srvc:grid srvc:gap-4 srvc:sm:grid-cols-2'>
+                {!privateProfile && <div className='srvc:grid srvc:gap-4 srvc:sm:grid-cols-2'>
                     <div>
                         <Label htmlFor='srvc-steam'>Steam artwork</Label>
                         <Select
@@ -124,8 +126,8 @@ export default function GameDialog({ game, preset = null, eggs, pending, onClose
                         <Label htmlFor='srvc-image'>Or an image URL</Label>
                         <Input id='srvc-image' type='url' placeholder='https://…' value={input.image ?? ''} onChange={(event) => set({ image: event.currentTarget.value || null })} />
                     </div>
-                </div>
-                {egg && egg.images.length > 1 && (
+                </div>}
+                {!privateProfile && egg && egg.images.length > 1 && (
                     <div>
                         <Label htmlFor='srvc-docker'>Docker image</Label>
                         <Select id='srvc-docker' placeholder='Egg default' value={input.docker_image} onChange={(value) => set({ docker_image: String(value) || null })} options={egg.images.map((image) => ({ value: image, label: image }))} />
@@ -146,14 +148,14 @@ export default function GameDialog({ game, preset = null, eggs, pending, onClose
                         </div>
                     ))}
                 </div>
-                <div className='srvc:grid srvc:grid-cols-3 srvc:gap-4'>
+                {!privateProfile && <div className='srvc:grid srvc:grid-cols-3 srvc:gap-4'>
                     {FEATURES.map(({ key, label }) => (
                         <div key={key}>
                             <Label htmlFor={`srvc-${key}`}>{label}</Label>
                             <Input id={`srvc-${key}`} type='number' min={0} max={100} value={input[key]} onChange={(event) => set({ [key]: Number(event.currentTarget.value) })} />
                         </div>
                     ))}
-                </div>
+                </div>}
                 <div className='srvc:grid srvc:gap-2'>
                     <div className='srvc:grid srvc:gap-4 srvc:sm:grid-cols-[10rem_minmax(0,1fr)]'>
                         <div>

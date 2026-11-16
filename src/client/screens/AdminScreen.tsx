@@ -45,6 +45,7 @@ export default function AdminScreen() {
                 </div>
                 <div className='srvc:flex srvc:shrink-0 srvc:items-center srvc:gap-3'>
                     <PanelLink destination={{ extension: 'server-creator', screen: 'audit' }} className='srvc:text-sm srvc:text-primary srvc:hover:underline'>View audit log</PanelLink>
+                    <PanelLink destination={{ extension: 'server-creator', screen: 'imported-games' }} className='srvc:text-sm srvc:text-primary srvc:hover:underline'>Manage imported eggs</PanelLink>
                     {data.data && data.data.eggs.length === 0 && <p className='srvc:text-xs srvc:text-muted-foreground'>Create an egg in the panel first.</p>}
                     <Button disabled={!data.data?.eggs.length} onClick={() => setEditing('new')}>
                         Add game

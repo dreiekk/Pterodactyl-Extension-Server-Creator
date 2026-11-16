@@ -21,6 +21,7 @@ export default definePterodactylExtension({
         screens.register('create', () => import('./screens/CreateScreen'));
         screens.register('admin', () => import('./screens/AdminScreen'));
         screens.register('audit', () => import('./screens/AuditScreen'));
+        screens.register('imported-games', () => import('./screens/ImportedGamesScreen'));
         screens.register('user-tab', () => import('./screens/UserTab'));
         screens.register('resources', () => import('./screens/ResourcesScreen'), { visible: useResourcesScreen });
         slots.register('dashboard.before', CreateBanner);

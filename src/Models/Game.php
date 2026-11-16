@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Pterodactyl\Models\Egg;
+use Pterodactyl\Models\User;
+use ServerCreator\Exceptions\CreatorException;
 use ServerCreator\Steam\Store;
 use ServerCreator\Support\PopularGames;
 
@@ -52,6 +54,16 @@ final class Game extends Model
     public function egg(): BelongsTo
     {
         return $this->belongsTo(Egg::class);
+    }
+
+    public function owner(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'owner_id');
+    }
+
+    public function ensureCatalogSelectable(): void
+    {
+        throw_unless($this->enabled, new CreatorException('An administrator has disabled this imported egg profile. Contact an administrator to enable it.', 403));
     }
 
     /** Public games and this user's private games, when they have catalog access. */

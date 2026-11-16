@@ -16,6 +16,8 @@ const ACTIONS: Record<string, string> = {
     'game.created': 'Game created',
     'game.updated': 'Game updated',
     'game.deleted': 'Game deleted',
+    'imported_game.updated': 'Imported game updated',
+    'imported_game.deleted': 'Imported game deleted',
     'quota.default_updated': 'Default quota updated',
     'quota.user_updated': 'User quota updated',
     'quota.user_reset': 'User quota reset',

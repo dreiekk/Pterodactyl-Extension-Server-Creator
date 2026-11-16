@@ -7,6 +7,10 @@ use ServerCreator\Http\Controllers\AdminController;
 
 Route::get('/', [AdminController::class, 'index']);
 Route::get('/audit', [AdminController::class, 'audit']);
+Route::get('/imported-games', [AdminController::class, 'importedGames']);
+Route::put('/imported-games/{id}', [AdminController::class, 'updateImportedGame'])->whereNumber('id');
+Route::patch('/imported-games/{id}/enabled', [AdminController::class, 'enableImportedGame'])->whereNumber('id');
+Route::delete('/imported-games/{id}', [AdminController::class, 'destroyImportedGame'])->whereNumber('id');
 Route::post('/games', [AdminController::class, 'storeGame']);
 Route::put('/games/{id}', [AdminController::class, 'updateGame'])->whereNumber('id');
 Route::delete('/games/{id}', [AdminController::class, 'destroyGame'])->whereNumber('id');

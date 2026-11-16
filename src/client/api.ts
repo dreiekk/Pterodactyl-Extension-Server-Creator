@@ -149,6 +149,11 @@ export interface AdminUser {
     servers: { id: number; name: string; game: string | null }[];
 }
 
+export interface ImportedGame extends Game {
+    owner_id: number;
+    owner_name: string;
+}
+
 export interface Copy {
     id: number;
     source: string;
@@ -183,6 +188,7 @@ export const keys = {
     server: (id: string) => ['server-creator', 'server', id] as const,
     allocations: (id: string) => ['server-creator', 'allocations', id] as const,
     admin: ['server-creator', 'admin'] as const,
+    importedGames: ['server-creator', 'imported-games'] as const,
     audit: (before?: number) => ['server-creator', 'audit', before ?? null] as const,
     user: (id: number) => ['server-creator', 'user', id] as const,
     users: (query: string) => ['server-creator', 'users', query] as const,
@@ -206,6 +212,10 @@ export const swapAllocations = async (id: string, other: number) =>
     (await http.post<ServerAllocations>(`${server(id)}/allocations/swap`, { server: other })).data;
 
 export const getAdmin = async () => (await http.get<Admin>(admin)).data;
+export const getImportedGames = async () => (await http.get<{ games: ImportedGame[] }>(`${admin}/imported-games`)).data.games;
+export const saveImportedGame = async (id: number, input: GameInput) => (await http.put<{ games: ImportedGame[] }>(`${admin}/imported-games/${id}`, input)).data.games;
+export const enableImportedGame = async (id: number, enabled: boolean) => (await http.patch<{ games: ImportedGame[] }>(`${admin}/imported-games/${id}/enabled`, { enabled })).data.games;
+export const deleteImportedGame = async (id: number) => (await http.delete<{ games: ImportedGame[] }>(`${admin}/imported-games/${id}`)).data.games;
 export const getAudit = async (before?: number) => (await http.get<AuditPage>(`${admin}/audit`, { params: before === undefined ? {} : { before } })).data;
 export const saveGame = async (game: GameInput, id?: number) => (id ? await http.put<Admin>(`${admin}/games/${id}`, game) : await http.post<Admin>(`${admin}/games`, game)).data;
 export const deleteGame = async (id: number) => (await http.delete<Admin>(`${admin}/games/${id}`)).data;
