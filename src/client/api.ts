@@ -158,6 +158,21 @@ export interface Copy {
     created_at: string;
 }
 
+export interface AuditEntry {
+    id: number;
+    actor_id: number;
+    actor_name: string;
+    action: string;
+    target: string;
+    details: Record<string, unknown>;
+    created_at: string;
+}
+
+export interface AuditPage {
+    entries: AuditEntry[];
+    next_before: number | null;
+}
+
 const client = '/api/client/extensions/server-creator';
 const server = (id: string) => `/api/client/servers/${id}/extensions/server-creator`;
 const admin = '/api/admin/extensions/server-creator';
@@ -168,6 +183,7 @@ export const keys = {
     server: (id: string) => ['server-creator', 'server', id] as const,
     allocations: (id: string) => ['server-creator', 'allocations', id] as const,
     admin: ['server-creator', 'admin'] as const,
+    audit: (before?: number) => ['server-creator', 'audit', before ?? null] as const,
     user: (id: number) => ['server-creator', 'user', id] as const,
     users: (query: string) => ['server-creator', 'users', query] as const,
     steam: (term: string) => ['server-creator', 'steam', term] as const,
@@ -190,6 +206,7 @@ export const swapAllocations = async (id: string, other: number) =>
     (await http.post<ServerAllocations>(`${server(id)}/allocations/swap`, { server: other })).data;
 
 export const getAdmin = async () => (await http.get<Admin>(admin)).data;
+export const getAudit = async (before?: number) => (await http.get<AuditPage>(`${admin}/audit`, { params: before === undefined ? {} : { before } })).data;
 export const saveGame = async (game: GameInput, id?: number) => (id ? await http.put<Admin>(`${admin}/games/${id}`, game) : await http.post<Admin>(`${admin}/games`, game)).data;
 export const deleteGame = async (id: number) => (await http.delete<Admin>(`${admin}/games/${id}`)).data;
 export const saveDefaultQuota = async (limits: Limits) => (await http.put<Admin>(`${admin}/quota`, limits)).data;

@@ -13,6 +13,7 @@ use ServerCreator\Models\CatalogPermission;
 use ServerCreator\Models\Game;
 use ServerCreator\Models\OwnedServer;
 use ServerCreator\Panel\Panel;
+use ServerCreator\Services\Audit;
 use ServerCreator\Services\Quotas;
 use ServerCreator\Services\ServerManager;
 use ServerCreator\Settings;
@@ -24,7 +25,7 @@ use ServerCreator\Support\Quota;
  */
 final class ServerController
 {
-    public function __construct(private readonly ServerManager $manager, private readonly Quotas $quotas, private readonly Settings $settings, private readonly Panel $panel) {}
+    public function __construct(private readonly ServerManager $manager, private readonly Quotas $quotas, private readonly Settings $settings, private readonly Panel $panel, private readonly Audit $audit) {}
 
     public function index(Request $request, Server $server): JsonResponse
     {
@@ -76,7 +77,9 @@ final class ServerController
             'cpu' => ['required', 'integer', 'min:1'],
         ]);
 
+        $before = $server->only(['memory', 'disk', 'cpu']);
         $this->manager->resize($request->user(), $server, (int) $data['memory'], (int) $data['disk'], (int) $data['cpu']);
+        $this->audit->record($request->user(), 'server.resized', $server->name, ['server_id' => $server->id, 'before' => $before, 'after' => $data]);
 
         return $this->index($request, $server->refresh());
     }
@@ -97,12 +100,18 @@ final class ServerController
         $user = $request->user();
         $game = Game::query()->availableTo($user->id, CatalogPermission::query()->whereKey($user->id)->exists())->with('egg')->where('enabled', true)->find((int) $data['game']) ?? throw new CreatorException('This game cannot be picked.', 422);
 
+        $previousEgg = $server->egg_id;
         $this->manager->switchGame($request->user(), $server, $game, [
             'memory' => (int) $data['memory'],
             'disk' => (int) $data['disk'],
             'cpu' => (int) $data['cpu'],
             'keep_variables' => (bool) $data['keep_variables'],
             'reinstall' => (bool) $data['reinstall'],
+        ]);
+        $this->audit->record($user, 'server.game_switched', $server->name, [
+            'server_id' => $server->id, 'previous_egg_id' => $previousEgg, 'game_id' => $game->id, 'game' => $game->name,
+            'egg_id' => $game->egg_id, 'memory' => (int) $data['memory'], 'disk' => (int) $data['disk'], 'cpu' => (int) $data['cpu'],
+            'keep_variables' => (bool) $data['keep_variables'], 'reinstall' => (bool) $data['reinstall'],
         ]);
 
         return $this->index($request, $server->refresh());
@@ -114,6 +123,7 @@ final class ServerController
         throw_unless($request->input('name') === $server->name, new CreatorException('Type the server name to confirm.'));
 
         $this->manager->delete($request->user(), $server);
+        $this->audit->record($request->user(), 'server.deleted', $server->name, ['server_id' => $server->id]);
 
         return new JsonResponse(status: 204);
     }
@@ -143,7 +153,9 @@ final class ServerController
             'allocations.*' => ['required', 'integer', 'min:1', 'distinct'],
         ]);
 
+        $before = $this->panel->allocationsOf($server);
         $this->manager->updateAllocations($request->user(), $server, (int) $data['primary'], array_map(intval(...), $data['allocations']));
+        $this->audit->record($request->user(), 'server.ports_changed', $server->name, ['server_id' => $server->id, 'before' => $before, 'after' => $this->panel->allocationsOf($server), 'primary' => (int) $data['primary']]);
 
         return $this->allocations($request, $server->refresh());
     }
@@ -151,7 +163,9 @@ final class ServerController
     public function swapAllocations(Request $request, Server $server): JsonResponse
     {
         $data = $request->validate(['server' => ['required', 'integer', 'min:1']]);
+        $before = $this->panel->allocationsOf($server);
         $this->manager->swapAllocations($request->user(), $server, (int) $data['server']);
+        $this->audit->record($request->user(), 'server.ports_swapped', $server->name, ['server_id' => $server->id, 'other_server_id' => (int) $data['server'], 'before' => $before, 'after' => $this->panel->allocationsOf($server)]);
 
         return $this->allocations($request, $server->refresh());
     }

@@ -18,6 +18,7 @@ export default function UserTab() {
     const update = (result: AdminUser) => {
         queryClient.setQueryData(keys.user(id), result);
         queryClient.invalidateQueries({ queryKey: keys.admin });
+        queryClient.invalidateQueries({ queryKey: ['server-creator', 'audit'] });
     };
     const onError = (error: unknown) => toast.error(httpErrorToHuman(error));
     const saving = useMutation({ mutationFn: () => saveUserQuota(id, limits!), onSuccess: (result) => (update(result), toast.success('Quota saved.')), onError });
@@ -26,6 +27,7 @@ export default function UserTab() {
         mutationFn: (allowed: boolean) => saveCatalogPermission(id, allowed),
         onSuccess: (result) => {
             queryClient.setQueryData<AdminUser>(keys.user(id), (current) => current ? { ...current, can_import_eggs: result.can_import_eggs } : result);
+            queryClient.invalidateQueries({ queryKey: ['server-creator', 'audit'] });
             toast.success('Egg import permission updated.');
         },
         onError,

@@ -19,6 +19,7 @@ use ServerCreator\Models\Game;
 use ServerCreator\Models\OwnedServer;
 use ServerCreator\Models\QuotaLimit;
 use ServerCreator\Panel\Panel;
+use ServerCreator\Services\Audit;
 use ServerCreator\Services\Duplicator;
 use ServerCreator\Services\Quotas;
 use ServerCreator\Steam\Store;
@@ -28,7 +29,7 @@ use ServerCreator\Support\Quota;
 
 final class AdminController
 {
-    public function __construct(private readonly Panel $panel, private readonly Quotas $quotas) {}
+    public function __construct(private readonly Panel $panel, private readonly Quotas $quotas, private readonly Audit $audit) {}
 
     public function index(): JsonResponse
     {
@@ -60,30 +61,40 @@ final class AdminController
     {
         $data = $this->validatedGame($request, importable: true);
         $catalog = Arr::pull($data, 'catalog_id');
+        $eggImported = ($data['egg_id'] ?? null) === null;
         $data['egg_id'] ??= $this->panel->importCatalogEgg($catalog)->id;
 
-        Game::query()->create($data);
+        $game = Game::query()->create($data);
+        $this->audit->record($request->user(), 'game.created', $game->name, ['game_id' => $game->id, 'egg_id' => $game->egg_id, 'catalog_id' => $catalog, 'egg_imported' => $eggImported]);
 
         return $this->index();
     }
 
     public function updateGame(Request $request, int $id): JsonResponse
     {
-        Game::query()->whereNull('owner_id')->findOrFail($id)->update($this->validatedGame($request));
+        $game = Game::query()->whereNull('owner_id')->findOrFail($id);
+        $before = $game->only(['name', 'egg_id', 'enabled', 'ports', 'default_ports', 'port_variables', 'port_range', 'memory_min', 'memory_max', 'disk_min', 'disk_max', 'cpu_min', 'cpu_max', 'databases', 'backups', 'allocations']);
+        $game->update($this->validatedGame($request));
+        $this->audit->record($request->user(), 'game.updated', $game->name, ['game_id' => $game->id, 'before' => $before, 'after' => $game->only(array_keys($before))]);
 
         return $this->index();
     }
 
-    public function destroyGame(int $id): JsonResponse
+    public function destroyGame(Request $request, int $id): JsonResponse
     {
-        Game::query()->whereNull('owner_id')->findOrFail($id)->delete();
+        $game = Game::query()->whereNull('owner_id')->findOrFail($id);
+        $game->delete();
+        $this->audit->record($request->user(), 'game.deleted', $game->name, ['game_id' => $game->id, 'egg_id' => $game->egg_id]);
 
         return $this->index();
     }
 
     public function updateQuota(Request $request): JsonResponse
     {
-        QuotaLimit::query()->updateOrCreate(['user_id' => null], Quota::attributesFor($this->validatedQuota($request)));
+        $limits = $this->validatedQuota($request);
+        $previous = QuotaLimit::query()->whereNull('user_id')->first()?->limits();
+        QuotaLimit::query()->updateOrCreate(['user_id' => null], Quota::attributesFor($limits));
+        $this->audit->record($request->user(), 'quota.default_updated', 'Default quota', ['before' => $previous, 'after' => $limits]);
 
         return $this->index();
     }
@@ -91,7 +102,10 @@ final class AdminController
     public function updateLocations(Request $request): JsonResponse
     {
         $data = $request->validate(['locations' => ['present', 'array'], 'locations.*' => ['integer', 'exists:locations,id']]);
-        $this->panel->setLocations(array_values(array_unique(array_map(intval(...), $data['locations']))));
+        $before = $this->panel->locations();
+        $locations = array_values(array_unique(array_map(intval(...), $data['locations'])));
+        $this->panel->setLocations($locations);
+        $this->audit->record($request->user(), 'locations.updated', 'Placement locations', ['before' => $before, 'after' => $locations]);
 
         return $this->index();
     }
@@ -127,14 +141,22 @@ final class AdminController
     public function updateUser(Request $request, int $id): JsonResponse
     {
         $user = User::query()->findOrFail($id);
-        QuotaLimit::query()->updateOrCreate(['user_id' => $user->id], Quota::attributesFor($this->validatedQuota($request)));
+        $limits = $this->validatedQuota($request);
+        $previous = QuotaLimit::query()->where('user_id', $user->id)->first()?->limits();
+        QuotaLimit::query()->updateOrCreate(['user_id' => $user->id], Quota::attributesFor($limits));
+        $this->audit->record($request->user(), 'quota.user_updated', $user->username, ['user_id' => $user->id, 'before' => $previous, 'after' => $limits]);
 
         return $this->user($id);
     }
 
-    public function resetUser(int $id): JsonResponse
+    public function resetUser(Request $request, int $id): JsonResponse
     {
+        $user = User::query()->findOrFail($id);
+        $previous = QuotaLimit::query()->where('user_id', $id)->first()?->limits();
         QuotaLimit::query()->where('user_id', $id)->delete();
+        if ($previous !== null) {
+            $this->audit->record($request->user(), 'quota.user_reset', $user->username, ['user_id' => $id, 'before' => $previous]);
+        }
 
         return $this->user($id);
     }
@@ -143,10 +165,14 @@ final class AdminController
     {
         $user = User::query()->findOrFail($id);
         $data = $request->validate(['allowed' => ['required', 'boolean']]);
+        $previous = CatalogPermission::query()->whereKey($user->id)->exists();
         if ($data['allowed']) {
             CatalogPermission::query()->firstOrCreate(['user_id' => $user->id]);
         } else {
             CatalogPermission::query()->whereKey($user->id)->delete();
+        }
+        if ($previous !== (bool) $data['allowed']) {
+            $this->audit->record($request->user(), 'catalog.permission_changed', $user->username, ['user_id' => $user->id, 'allowed' => (bool) $data['allowed']]);
         }
 
         return $this->user($id);
@@ -167,8 +193,19 @@ final class AdminController
         ]);
 
         $server = $duplicator->duplicate($source, $request->user(), $data['name'], User::query()->findOrFail($data['owner']), (bool) ($data['files'] ?? false));
+        $this->audit->record($request->user(), 'server.duplicated', $server->name, [
+            'server_id' => $server->id, 'source_id' => $source->id, 'source' => $source->name,
+            'owner_id' => (int) $data['owner'], 'files_requested' => (bool) ($data['files'] ?? false),
+        ]);
 
         return new JsonResponse(['id' => $server->id, 'identifier' => $server->uuidShort], 201);
+    }
+
+    public function audit(Request $request): JsonResponse
+    {
+        $data = $request->validate(['before' => ['sometimes', 'integer', 'min:1']]);
+
+        return new JsonResponse($this->audit->page(isset($data['before']) ? (int) $data['before'] : null));
     }
 
     public function copies(int $id): JsonResponse

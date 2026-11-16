@@ -28,6 +28,7 @@ Let users create their own servers within a quota, and duplicate servers in one 
 - **Resources page**: owners resize, switch to another game and delete (opt-in) on their server's Resources page. A switch brings the new game's egg, limits and ports, and egg changes from other extensions keep the game and ports in step.
 - **Safe placement**: new servers only go to nodes with room, in the locations you choose.
 - **Duplicate**: copy any server from its admin page, optionally with all its files.
+- **Audit log**: administrators can review successful Server Creator actions on the admin page, including catalog selections, server changes, duplication requests, and game, quota, location and catalog-permission changes. Entries retain actor and target names after deletion and do not contain startup-variable values. A file-copy request is logged when queued, not as proof that the asynchronous copy completed. The panel's separate extension settings and actions outside Server Creator are not included.
 
 ![Resources page](docs/screenshots/resources.png)
 

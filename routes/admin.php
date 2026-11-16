@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Route;
 use ServerCreator\Http\Controllers\AdminController;
 
 Route::get('/', [AdminController::class, 'index']);
+Route::get('/audit', [AdminController::class, 'audit']);
 Route::post('/games', [AdminController::class, 'storeGame']);
 Route::put('/games/{id}', [AdminController::class, 'updateGame'])->whereNumber('id');
 Route::delete('/games/{id}', [AdminController::class, 'destroyGame'])->whereNumber('id');

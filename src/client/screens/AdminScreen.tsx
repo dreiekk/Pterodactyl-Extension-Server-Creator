@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Dialog, PageContentBlock, PanelLink, Select, ServerError, Spinner, TitledGreyBox, httpErrorToHuman, toast, usePanelNavigate } from '@pterodactyl/sdk';
 import { deleteGame, getAdmin, keys, saveDefaultQuota, saveGame, saveLocations, type Admin, type Game, type GameInput, type Limits, type PopularGame } from '../api';
 import Artwork from '../components/Artwork';
+import AuditLog from '../components/AuditLog';
 import GameDialog from '../components/GameDialog';
 import QuotaFields from '../components/QuotaFields';
 import UserSelect from '../components/UserSelect';
@@ -25,7 +26,10 @@ export default function AdminScreen() {
         }
     }, [data.data]);
 
-    const update = (result: Admin) => queryClient.setQueryData(keys.admin, result);
+    const update = (result: Admin) => {
+        queryClient.setQueryData(keys.admin, result);
+        queryClient.invalidateQueries({ queryKey: ['server-creator', 'audit'] });
+    };
     const onError = (error: unknown) => toast.error(httpErrorToHuman(error));
 
     const saving = useMutation({ mutationFn: (input: GameInput) => saveGame(input, editing && editing !== 'new' && 'id' in editing ? editing.id : undefined), onSuccess: (result) => (update(result), setEditing(null)), onError });
@@ -144,6 +148,7 @@ export default function AdminScreen() {
                                 </div>
                             </TitledGreyBox>
                         </div>
+                        <AuditLog />
                     </div>
                 </div>
             )}

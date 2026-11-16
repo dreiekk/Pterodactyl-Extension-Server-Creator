@@ -18,13 +18,14 @@ use ServerCreator\Models\CatalogPermission;
 use ServerCreator\Models\Game;
 use ServerCreator\Models\OwnedServer;
 use ServerCreator\Panel\Panel;
+use ServerCreator\Services\Audit;
 use ServerCreator\Services\Quotas;
 use ServerCreator\Services\ServerManager;
 use ServerCreator\Support\Quota;
 
 final class ClientController
 {
-    public function __construct(private readonly Quotas $quotas, private readonly ServerManager $manager) {}
+    public function __construct(private readonly Quotas $quotas, private readonly ServerManager $manager, private readonly Audit $audit) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -74,6 +75,11 @@ final class ClientController
                 'backups' => (int) ($data['backups'] ?? 0),
                 'allocations' => (int) ($data['allocations'] ?? 0),
             ] : []),
+        ]);
+        $this->audit->record($user, 'server.created', $server->name, [
+            'server_id' => $server->id, 'game_id' => $game->id, 'game' => $game->name, 'egg_id' => $game->egg_id,
+            'memory' => (int) $server->memory, 'disk' => (int) $server->disk, 'cpu' => (int) $server->cpu,
+            'databases' => (int) $server->database_limit, 'backups' => (int) $server->backup_limit, 'allocations' => (int) $server->allocation_limit,
         ]);
 
         return new JsonResponse(['identifier' => $server->uuidShort], 201);
@@ -138,6 +144,10 @@ final class ClientController
                 if (! $mapping) {
                     Activity::event('admin:egg.import')->subject($egg)->property(['name' => $egg->name, 'catalog_id' => $entry->id, 'via' => 'server-creator'])->log();
                 }
+                $this->audit->record($user, 'catalog.selected', $entry->name, [
+                    'catalog_id' => $entry->id, 'egg_id' => $egg->id, 'game_id' => $game->id,
+                    'egg_imported' => ! $mapping, 'profile_created' => $game->wasRecentlyCreated,
+                ]);
 
                 return $game;
             });
