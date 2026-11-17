@@ -199,6 +199,7 @@ export const keys = {
 export const getOverview = async () => (await http.get<Overview>(client)).data;
 export const createServer = async (input: CreateInput) => (await http.post<{ identifier: string }>(`${client}/servers`, input)).data;
 export const getCatalog = async () => (await http.get<{ eggs: CatalogEgg[] }>(`${client}/catalog`)).data.eggs;
+export const getCatalogPorts = async (id: string) => (await http.get<{ default_ports: number[] | null }>(`${client}/catalog/ports`, { params: { catalog_id: id } })).data.default_ports;
 export const importCatalogEgg = async (input: CatalogImport) => (await http.post<{ game: Game }>(`${client}/catalog/import`, input)).data.game;
 
 export const getOwnedServer = async (id: string) => (await http.get<OwnedServer>(server(id))).data;

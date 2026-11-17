@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace ServerCreator\Http\Controllers;
 
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
 use Pterodactyl\Facades\Activity;
 use Pterodactyl\Services\Eggs\EggCatalogService;
@@ -21,6 +23,7 @@ use ServerCreator\Panel\Panel;
 use ServerCreator\Services\Audit;
 use ServerCreator\Services\Quotas;
 use ServerCreator\Services\ServerManager;
+use ServerCreator\Support\CatalogPorts;
 use ServerCreator\Support\Quota;
 
 final class ClientController
@@ -90,6 +93,28 @@ final class ClientController
         $this->authorizeCatalog($request);
 
         return new JsonResponse(['eggs' => array_map(static fn ($entry): array => $entry->toArray(), $catalog->all())]);
+    }
+
+    public function catalogPorts(Request $request, EggCatalogService $catalog): JsonResponse
+    {
+        $this->authorizeCatalog($request);
+        $data = $request->validate(['catalog_id' => ['required', 'string', 'max:191']]);
+        $entry = collect($catalog->all())->first(static fn ($entry): bool => $entry->id === $data['catalog_id']);
+        throw_unless($entry, new CreatorException('The selected egg is no longer in the catalog.', 404));
+
+        $ports = Cache::remember('ext:server-creator:catalog-ports:'.hash('sha256', $entry->id), 3600, static function () use ($entry): ?array {
+            try {
+                $response = Http::accept('text/html')->connectTimeout(3)->timeout(10)->withoutRedirecting()
+                    ->get('https://eggs.pterodactyl.io/egg/'.rawurlencode($entry->id).'/');
+            } catch (ConnectionException) {
+                throw new CreatorException('Could not reach the egg catalog. Please enter the ports manually.', 502);
+            }
+            throw_unless($response->successful(), new CreatorException('Could not retrieve ports from the egg catalog. Please enter them manually.', 502));
+
+            return CatalogPorts::fromPage($response->body());
+        });
+
+        return new JsonResponse(['default_ports' => $ports]);
     }
 
     public function importCatalog(Request $request, EggCatalogService $catalog, Panel $panel): JsonResponse
